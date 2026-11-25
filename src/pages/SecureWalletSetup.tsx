@@ -1,13 +1,15 @@
 import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PasswordField from '../components/common/PasswordField';
 import { useWalletSetup } from '../wallet/WalletSetupContext';
 
 const SecureWalletSetup: React.FC = () => {
   const navigate = useNavigate();
   const { completeSetup, discardPendingWallet, storageError } = useWalletSetup();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [useSessionPin, setUseSessionPin] = useState(false);
   const [pin, setPin] = useState('');
   const [pinConfirmation, setPinConfirmation] = useState('');
   const [error, setError] = useState('');
@@ -16,6 +18,14 @@ const SecureWalletSetup: React.FC = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    if (!name.trim()) {
+      setError('Enter the name for this wallet.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Enter a valid email address for this wallet.');
+      return;
+    }
     if (password.length < 12) {
       setError('Use a wallet password at least 12 characters long.');
       return;
@@ -24,14 +34,16 @@ const SecureWalletSetup: React.FC = () => {
       setError('The passwords do not match.');
       return;
     }
-    if (useSessionPin && (!/^\d{6}$/.test(pin) || pin !== pinConfirmation)) {
-      setError('Enter and confirm the same six-digit session PIN.');
+    if (!/^\d{6}$/.test(pin) || pin !== pinConfirmation) {
+      setError('Enter and confirm the same six-digit code.');
       return;
     }
 
     setSaving(true);
     try {
-      await completeSetup(password, useSessionPin ? pin : undefined);
+      await completeSetup(password, pin, { name, email });
+      setName('');
+      setEmail('');
       setPassword('');
       setConfirmation('');
       setPin('');
@@ -65,83 +77,107 @@ const SecureWalletSetup: React.FC = () => {
         </div>
 
         <form className="mt-8 flex flex-1 flex-col" onSubmit={handleSubmit}>
-          <h1 className="text-[22px] font-semibold leading-7">Create wallet password</h1>
+          <h1 className="text-[22px] font-semibold leading-7">Create your wallet</h1>
           <p className="mt-2 text-sm leading-5 text-on-surface-variant">
-            This password encrypts your wallet and is required every time you unlock it.
+            Your name and email identify this wallet. The password encrypts it on this device, and the six-digit code signs you in.
           </p>
 
-          <label className="mt-6 text-sm text-on-surface-variant" htmlFor="wallet-password">
-            Wallet password
+          <label className="mt-6 text-sm text-on-surface-variant" htmlFor="wallet-owner-name">
+            Your name
           </label>
           <input
+            autoComplete="name"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
+            id="wallet-owner-name"
+            maxLength={80}
+            onChange={(event) => setName(event.target.value)}
+            required
+            type="text"
+            value={name}
+          />
+
+          <label className="mt-4 text-sm text-on-surface-variant" htmlFor="wallet-owner-email">
+            Email
+          </label>
+          <input
+            autoComplete="email"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
+            id="wallet-owner-email"
+            maxLength={254}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            type="email"
+            value={email}
+          />
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+            This email and your six-digit code are how you sign back in to this wallet.
+          </p>
+
+          <label className="mt-5 text-sm text-on-surface-variant" htmlFor="wallet-password">
+            Wallet password
+          </label>
+          <PasswordField
             autoComplete="new-password"
             className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
             id="wallet-password"
+            label="wallet password"
             minLength={12}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
             required
-            type="password"
             value={password}
           />
 
           <label className="mt-4 text-sm text-on-surface-variant" htmlFor="confirm-wallet-password">
             Confirm wallet password
           </label>
-          <input
+          <PasswordField
             autoComplete="new-password"
             className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
             id="confirm-wallet-password"
-            onChange={(event) => setConfirmation(event.target.value)}
+            label="confirm wallet password"
+            onChange={setConfirmation}
             required
-            type="password"
             value={confirmation}
           />
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">
             There is no password reset service. If you forget it, you must restore using your recovery phrase.
           </p>
 
-          <label className="mt-5 flex items-start gap-3 rounded-xl bg-surface-container-low p-3 text-xs leading-5 text-on-surface-variant">
-            <input
-              checked={useSessionPin}
-              className="mt-0.5 h-4 w-4 accent-primary"
-              onChange={(event) => setUseSessionPin(event.target.checked)}
-              type="checkbox"
-            />
-            <span>
-              Add an optional six-digit PIN for quick locking in this open tab. It is not stored and does not encrypt the wallet; after reload, use the wallet password.
-            </span>
+          <label className="mt-5 block text-sm text-on-surface-variant" htmlFor="wallet-pin">
+            Six-digit sign-in code
           </label>
-
-          {useSessionPin && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="text-xs text-on-surface-variant" htmlFor="session-pin">
-                Six-digit PIN
-                <input
-                  autoComplete="off"
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface"
-                  id="session-pin"
-                  inputMode="numeric"
-                  maxLength={6}
-                  onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
-                  pattern="\d{6}"
-                  value={pin}
-                />
-              </label>
-              <label className="text-xs text-on-surface-variant" htmlFor="confirm-session-pin">
-                Confirm PIN
-                <input
-                  autoComplete="off"
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface"
-                  id="confirm-session-pin"
-                  inputMode="numeric"
-                  maxLength={6}
-                  onChange={(event) => setPinConfirmation(event.target.value.replace(/\D/g, ''))}
-                  pattern="\d{6}"
-                  value={pinConfirmation}
-                />
-              </label>
-            </div>
-          )}
+          <PasswordField
+            autoComplete="off"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
+            id="wallet-pin"
+            inputClassName="text-center text-lg tracking-[0.5em]"
+            inputMode="numeric"
+            label="six-digit code"
+            maxLength={6}
+            onChange={(value) => setPin(value.replace(/\D/g, ''))}
+            pattern="\d{6}"
+            required
+            value={pin}
+          />
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+            You will use this code, together with your email, to sign in from now on. It is stored securely on the server, never in this browser.
+          </p>
+          <label className="mt-4 block text-sm text-on-surface-variant" htmlFor="confirm-wallet-pin">
+            Confirm six-digit code
+          </label>
+          <PasswordField
+            autoComplete="off"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
+            id="confirm-wallet-pin"
+            inputClassName="text-center text-lg tracking-[0.5em]"
+            inputMode="numeric"
+            label="confirm six-digit code"
+            maxLength={6}
+            onChange={(value) => setPinConfirmation(value.replace(/\D/g, ''))}
+            pattern="\d{6}"
+            required
+            value={pinConfirmation}
+          />
 
           {(error || storageError) && (
             <p aria-live="polite" className="mt-3 text-sm text-error">

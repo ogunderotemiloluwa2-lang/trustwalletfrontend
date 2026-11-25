@@ -11,7 +11,7 @@ const WelcomeOnboarding: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [setupError, setSetupError] = useState('');
 
-  const accountNotice = (location.state as { accountEmail?: string; accountCreated?: boolean } | null) || {};
+  const accountNotice = (location.state as { accountEmail?: string } | null) || {};
 
   const slides = [
     {
@@ -163,15 +163,14 @@ const WelcomeOnboarding: React.FC = () => {
                 {setupError}
               </p>
             )}
-            {/* Account confirmation after sign-up or sign-in */}
+            {/* Account confirmation after sign-in */}
             {accountNotice.accountEmail && (
               <p
                 aria-live="polite"
                 className="mb-3 w-full rounded-2xl border border-primary/20 bg-surface-container-high px-4 py-3 text-center font-body-sm text-body-sm text-on-surface-variant"
               >
-                {accountNotice.accountCreated ? 'Account created for ' : 'Signed in as '}
-                <span className="text-on-surface">{accountNotice.accountEmail}</span>. Create or
-                import a wallet to continue.
+                Signed in as <span className="text-on-surface">{accountNotice.accountEmail}</span>.
+                Create or import a wallet to continue.
               </p>
             )}
 
@@ -201,7 +200,7 @@ const WelcomeOnboarding: React.FC = () => {
               onClick={() => navigate('/account')}
             >
               <span className="material-symbols-outlined text-lg">person</span>
-              <span>Sign in or create an account</span>
+              <span>Sign in to an existing wallet</span>
             </button>
 
             {/* Micro-copy Footer Legal Link */}

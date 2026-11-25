@@ -18,9 +18,29 @@ import {
 } from './walletSetup';
 import { isWalletNetwork } from './chainRegistry';
 import type { WalletNetwork } from './chainRegistry';
+import {
+  clearSessionLocked,
+  forgetSessionPin,
+  forgetUnlock,
+  markSessionLocked,
+  readRememberedUnlock,
+  readSessionLocked,
+  readSessionPin,
+  rememberSessionPin,
+  rememberUnlock,
+} from './sessionUnlock';
+import { readAccountSession, saveAccountSession } from '../services/authSession';
+import { loginAccount, registerAccount, setAccountPin } from '../services/authApi';
+import { saveWalletRecord } from '../services/walletApi';
 
 type WalletSigner = Wallet | HDNodeWallet;
 export type { WalletNetwork } from './chainRegistry';
+
+/** Identity collected while creating the wallet; it owns the account record. */
+export interface WalletOwnerIdentity {
+  name: string;
+  email: string;
+}
 
 interface WalletSetupContextValue {
   address: string | null;
@@ -35,7 +55,7 @@ interface WalletSetupContextValue {
   storageError: string;
   createWallet: () => void;
   importWallet: (phrase: string) => string;
-  completeSetup: (password: string, sessionPin?: string) => Promise<void>;
+  completeSetup: (password: string, pin: string, identity: WalletOwnerIdentity) => Promise<void>;
   unlockWithPassword: (password: string) => Promise<void>;
   unlockWithSessionPin: (pin: string) => boolean;
   lockWithSessionPin: () => boolean;
@@ -53,8 +73,11 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [pendingWallet, setPendingWallet] = useState<Wallet | null>(null);
   const [pendingAddresses, setPendingAddresses] = useState<WalletAddresses | null>(null);
+  // Tracks whether the pending wallet came from a recovery phrase so the saved
+  // record can report the correct source.
+  const importedWalletRef = React.useRef(false);
   const [wallet, setWallet] = useState<WalletSigner | null>(null);
-  const [sessionPin, setSessionPin] = useState<string | null>(null);
+  const [sessionPin, setSessionPin] = useState<string | null>(() => readSessionPin());
   const [isReady, setIsReady] = useState(false);
   const [hasVault, setHasVault] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -64,12 +87,30 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
   useEffect(() => {
     let active = true;
     Promise.all([readEncryptedKeystore(), readSelectedNetwork(), readWalletAddresses()])
-      .then(([keystore, savedNetwork, savedAddresses]) => {
+      .then(async ([keystore, savedNetwork, savedAddresses]) => {
         if (!active) return;
         setHasVault(Boolean(keystore));
         if (savedAddresses) setReceiveAddresses(savedAddresses);
         if (savedNetwork && isWalletNetwork(savedNetwork)) {
           setNetwork(savedNetwork);
+        }
+
+        // A refresh inside the same tab should not force the user to sign in
+        // again, so re-open the vault with the password kept for this tab.
+        // An explicit lock keeps the wallet closed until the six-digit code is
+        // entered, but the signer is still restored so that code can unlock it.
+        const rememberedPassword = keystore ? readRememberedUnlock() : null;
+        if (!rememberedPassword) return;
+        try {
+          const restoredWallet = await unlockEncryptedWallet(keystore as string, rememberedPassword);
+          if (!active) return;
+          setWallet(restoredWallet);
+          setAddress(restoredWallet.address);
+          setIsUnlocked(!readSessionLocked());
+        } catch {
+          // The stored password no longer opens the vault; fall back to the
+          // unlock screen instead of surfacing a storage error.
+          forgetUnlock();
         }
       })
       .catch((error: unknown) => {
@@ -87,6 +128,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
 
   const createWallet = useCallback(() => {
     const result = createWalletSetup();
+    importedWalletRef.current = false;
     setPendingWallet(result.wallet);
     setPendingAddresses(result.addresses);
     setReceiveAddresses(result.addresses);
@@ -97,6 +139,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
   const importWallet = useCallback((phrase: string) => {
     const imported = walletFromPhrase(phrase);
     const addresses = deriveWalletAddresses(phrase);
+    importedWalletRef.current = true;
     setPendingWallet(imported);
     setPendingAddresses(addresses);
     setReceiveAddresses(addresses);
@@ -105,9 +148,24 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     return imported.address;
   }, []);
 
-  const completeSetup = useCallback(async (password: string, pin?: string) => {
+  const completeSetup = useCallback(async (
+    password: string,
+    pin: string,
+    identity: WalletOwnerIdentity
+  ) => {
     if (!pendingWallet) {
       throw new Error('Create or import a wallet before setting its password.');
+    }
+    if (!/^\d{6}$/.test(pin)) {
+      throw new Error('Choose a six-digit sign-in code.');
+    }
+    const ownerName = identity.name.trim();
+    const ownerEmail = identity.email.trim().toLowerCase();
+    if (!ownerName) {
+      throw new Error('Enter the name for this wallet.');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
+      throw new Error('Enter a valid email address for this wallet.');
     }
 
     const encryptedJson = await pendingWallet.encrypt(password);
@@ -115,16 +173,59 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
       throw new Error('Wallet receive addresses are unavailable. Re-import the recovery phrase.');
     }
     await writeEncryptedKeystore(encryptedJson, pendingAddresses);
+    rememberUnlock(password);
+    clearSessionLocked();
     setWallet(pendingWallet);
     setReceiveAddresses(pendingAddresses);
     setAddress(pendingWallet.address);
     setPendingWallet(null);
     setPendingAddresses(null);
     setMnemonic(null);
-    setSessionPin(pin || null);
+    setSessionPin(pin);
+    rememberSessionPin(pin);
     setHasVault(true);
     setIsUnlocked(true);
-  }, [pendingWallet, pendingAddresses]);
+
+    // The wallet owns the account: creating a wallet creates (or signs into)
+    // the account that stores it, so there is no separate signup step. A
+    // backend outage must not block local wallet creation.
+    const existing = readAccountSession();
+    let session = existing && existing.user.email === ownerEmail ? existing : null;
+    if (!session) {
+      try {
+        session = await registerAccount({ email: ownerEmail, password, name: ownerName });
+      } catch {
+        try {
+          session = await loginAccount({ email: ownerEmail, password });
+        } catch {
+          session = null;
+        }
+      }
+    }
+    if (!session) return;
+
+    try {
+      await saveWalletRecord(session.token, {
+        address: pendingWallet.address,
+        label: `${ownerName}'s wallet`,
+        ownerName,
+        source: importedWalletRef.current ? 'imported' : 'created',
+        network,
+        addresses: pendingAddresses as unknown as Record<string, string>,
+      });
+    } catch {
+      // The wallet is already usable locally; the record can be retried later.
+    }
+    try {
+      // The six-digit code replaces the password for future sign-ins, so it
+      // is hashed and stored on the server rather than in this browser.
+      const user = await setAccountPin(session.token, pin);
+      saveAccountSession({ token: session.token, user });
+    } catch {
+      // Sign-in still works with the wallet password if this call fails.
+      saveAccountSession(session);
+    }
+  }, [pendingWallet, pendingAddresses, network]);
 
   const unlockWithPassword = useCallback(async (password: string) => {
     const encryptedJson = await readEncryptedKeystore();
@@ -133,6 +234,8 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     }
     const unlockedWallet = await unlockEncryptedWallet(encryptedJson, password);
     const savedAddresses = await readWalletAddresses();
+    rememberUnlock(password);
+    clearSessionLocked();
     setWallet(unlockedWallet);
     setReceiveAddresses(savedAddresses ?? {
       ethereum: unlockedWallet.address,
@@ -150,22 +253,28 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     });
     setAddress(unlockedWallet.address);
     setIsUnlocked(true);
-    setSessionPin(null);
   }, []);
 
   const unlockWithSessionPin = useCallback((pin: string) => {
     if (!sessionPin || pin !== sessionPin || !wallet) return false;
+    clearSessionLocked();
     setIsUnlocked(true);
     return true;
   }, [sessionPin, wallet]);
 
   const lockWithSessionPin = useCallback(() => {
     if (!sessionPin || !wallet) return false;
+    // An explicit lock must survive a refresh, so remember that the user locked
+    // the wallet even though the password stays available for the code unlock.
+    markSessionLocked();
     setIsUnlocked(false);
     return true;
   }, [sessionPin, wallet]);
 
   const lockWithPassword = useCallback(() => {
+    forgetUnlock();
+    forgetSessionPin();
+    markSessionLocked();
     setWallet(null);
     setAddress(null);
     setReceiveAddresses(null);
@@ -186,6 +295,9 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     if (!encryptedJson) throw new Error('No encrypted wallet was found.');
     await unlockEncryptedWallet(encryptedJson, password);
     await deleteEncryptedKeystore();
+    forgetUnlock();
+    forgetSessionPin();
+    clearSessionLocked();
     setWallet(null);
     setPendingWallet(null);
     setPendingAddresses(null);

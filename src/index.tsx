@@ -4,17 +4,17 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
-// Load Google Fonts (Plus Jakarta Sans and Inter)
-const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap';
-fontLink.rel = 'stylesheet';
-document.head.appendChild(fontLink);
-
-// Load Material Symbols
-const materialLink = document.createElement('link');
-materialLink.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap';
-materialLink.rel = 'stylesheet';
-document.head.appendChild(materialLink);
+// Web fonts are declared in public/index.html so they load before first paint.
+// Reveal Material Symbols only once the icon font is ready, otherwise the raw
+// ligature names ("arrow_forward") would be painted as text on first load.
+const revealIcons = () => document.documentElement.classList.add('fonts-ready');
+if (typeof document !== 'undefined' && 'fonts' in document) {
+  document.fonts.ready.then(revealIcons).catch(revealIcons);
+  // Safety net in case the font request never settles (offline, blocked CDN).
+  window.setTimeout(revealIcons, 3000);
+} else {
+  revealIcons();
+}
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

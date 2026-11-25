@@ -2,6 +2,8 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   name: string;
+  /** True once the account has a six-digit sign-in code stored on the server. */
+  hasPin: boolean;
 }
 
 export interface AuthSession {
@@ -34,7 +36,7 @@ const parseUser = (value: unknown): AuthenticatedUser => {
       typeof user.name !== 'string') {
     throw new Error('Authentication service returned an invalid user profile.');
   }
-  return { id: user.id, email: user.email, name: user.name };
+  return { id: user.id, email: user.email, name: user.name, hasPin: user.hasPin === true };
 };
 
 const request = async (
@@ -67,9 +69,38 @@ export const registerAccount = (
 }, fetcher);
 
 export const loginAccount = (
-  input: { email: string; password: string },
+  input: { email: string; password?: string; pin?: string },
   fetcher: typeof fetch = fetch
-): Promise<AuthSession> => request('login', input, fetcher);
+): Promise<AuthSession> => request('login', {
+  email: input.email,
+  password: input.password || '',
+  pin: input.pin || '',
+}, fetcher);
+
+/**
+ * Stores the six-digit code that replaces the password for later sign-ins. The
+ * code is hashed on the server and never kept in the browser.
+ */
+export const setAccountPin = async (
+  token: string,
+  pin: string,
+  fetcher: typeof fetch = fetch
+): Promise<AuthenticatedUser> => {
+  const response = await fetcher(authUrl('pin'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ pin }),
+  });
+  const result: AuthResponse = await response.json();
+  if (!response.ok) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Could not save the six-digit code.');
+  }
+  return parseUser(result.user);
+};
 
 export const fetchAuthenticatedProfile = async (
   token: string,

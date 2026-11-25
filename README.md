@@ -20,6 +20,17 @@ REACT_APP_API_URL=http://localhost:5000
 Because `REACT_APP_*` values are inlined at build time, changing this value
 requires a rebuild.
 
+## Accounts and sign-in
+
+- Account data (email, name, password hash, six-digit code hash, wallet records)
+  lives in MongoDB. Nothing about the user is written to `localStorage`.
+- Creating a wallet asks for a wallet password **and** a six-digit sign-in code.
+  The code is hashed on the server, so afterwards the account is signed in with
+  the email plus the six-digit code instead of the password.
+- The session token and the tab-scoped unlock state use `sessionStorage`, so a
+  page refresh keeps the user signed in while closing the tab clears it.
+- Every password input has a show/hide toggle.
+
 ### Tests
 
 ```bash

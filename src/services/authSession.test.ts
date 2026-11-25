@@ -4,12 +4,12 @@ const SESSION_KEY = 'account-session';
 
 const validSession = {
   token: 'header.payload.signature',
-  user: { id: 'user_1', email: 'ada@example.com', name: 'Ada' },
+  user: { id: 'user_1', email: 'ada@example.com', name: 'Ada', hasPin: false },
 };
 
 describe('account session storage', () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it('returns null when nothing has been stored', () => {
@@ -22,15 +22,15 @@ describe('account session storage', () => {
   });
 
   it('ignores malformed JSON instead of throwing', () => {
-    window.localStorage.setItem(SESSION_KEY, '{not json');
+    window.sessionStorage.setItem(SESSION_KEY, '{not json');
     expect(readAccountSession()).toBeNull();
   });
 
   it('ignores a stored value with a missing or invalid shape', () => {
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'abc' }));
+    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'abc' }));
     expect(readAccountSession()).toBeNull();
 
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       SESSION_KEY,
       JSON.stringify({ token: 'abc', user: { id: 1, email: 'a@b.c', name: 'A' } })
     );

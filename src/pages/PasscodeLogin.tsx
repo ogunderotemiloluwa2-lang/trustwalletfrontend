@@ -1,6 +1,7 @@
 import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TrustShield from '../components/common/TrustShield';
+import PasswordField from '../components/common/PasswordField';
 import { useWalletSetup } from '../wallet/WalletSetupContext';
 
 const PasscodeLogin: React.FC = () => {
@@ -10,7 +11,7 @@ const PasscodeLogin: React.FC = () => {
     unlockWithPassword,
     unlockWithSessionPin,
   } = useWalletSetup();
-  const [usePin, setUsePin] = useState(hasSessionPin);
+  const [usePassword, setUsePassword] = useState(!hasSessionPin);
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -38,10 +39,12 @@ const PasscodeLogin: React.FC = () => {
       setPin('');
       navigate('/portfolio', { replace: true });
     } else {
-      setError('Incorrect session PIN.');
+      setError('Incorrect six-digit code.');
       setPin('');
     }
   };
+
+  const showPinForm = hasSessionPin && !usePassword;
 
   return (
     <div className="min-h-screen bg-surface px-4 pb-safe pt-safe text-on-surface">
@@ -59,42 +62,42 @@ const PasscodeLogin: React.FC = () => {
             <TrustShield className="h-9 w-9" />
           </div>
           <h1 className="text-[22px] font-medium leading-7">
-            {usePin && hasSessionPin ? 'Quick unlock' : 'Unlock your wallet'}
+            {showPinForm ? 'Enter your code' : 'Unlock your wallet'}
           </h1>
           <p className="mt-2 max-w-xs text-sm leading-5 text-on-surface-variant">
-            {usePin && hasSessionPin
-              ? 'This optional PIN unlocks your wallet for the current session. Your wallet password is required after you close the app.'
+            {showPinForm
+              ? 'Enter the six-digit code you chose when you created your wallet.'
               : 'Enter your wallet password to continue.'}
           </p>
         </div>
 
-        {usePin && hasSessionPin ? (
+        {showPinForm ? (
           <form className="mt-8" onSubmit={submitPin}>
-            <label className="block text-sm text-on-surface-variant" htmlFor="quick-unlock-pin">
-              Six-digit session PIN
+            <label className="block text-sm text-on-surface-variant" htmlFor="wallet-unlock-pin">
+              Six-digit code
             </label>
-            <input
-              autoComplete="off"
+            <PasswordField
+              autoComplete="one-time-code"
               autoFocus
-              className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-center text-lg tracking-[0.5em] text-on-surface"
-              id="quick-unlock-pin"
+              id="wallet-unlock-pin"
+              inputClassName="text-center text-lg tracking-[0.5em]"
               inputMode="numeric"
+              label="six-digit code"
               maxLength={6}
-              onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
+              onChange={(value) => setPin(value.replace(/\D/g, ''))}
               pattern="\d{6}"
               required
-              type="password"
               value={pin}
             />
             <button
               className="mt-5 w-full rounded-full bg-primary-container py-3.5 text-sm font-medium text-white"
               type="submit"
             >
-              Unlock session
+              Unlock wallet
             </button>
             <button
               className="mt-3 w-full py-3 text-sm text-primary"
-              onClick={() => { setUsePin(false); setError(''); }}
+              onClick={() => { setUsePassword(true); setError(''); }}
               type="button"
             >
               Use wallet password instead
@@ -105,14 +108,13 @@ const PasscodeLogin: React.FC = () => {
             <label className="block text-sm text-on-surface-variant" htmlFor="wallet-unlock-password">
               Wallet password
             </label>
-            <input
+            <PasswordField
               autoComplete="current-password"
               autoFocus
-              className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface"
               id="wallet-unlock-password"
-              onChange={(event) => setPassword(event.target.value)}
+              label="wallet password"
+              onChange={setPassword}
               required
-              type="password"
               value={password}
             />
             <button
@@ -125,10 +127,10 @@ const PasscodeLogin: React.FC = () => {
             {hasSessionPin && (
               <button
                 className="mt-3 w-full py-3 text-sm text-primary"
-                onClick={() => { setUsePin(true); setError(''); }}
+                onClick={() => { setUsePassword(false); setError(''); }}
                 type="button"
               >
-                Use session PIN
+                Use six-digit code
               </button>
             )}
           </form>

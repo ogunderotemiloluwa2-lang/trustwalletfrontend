@@ -11,6 +11,26 @@
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <!--
+      Fonts are declared here (not injected from JavaScript) so the browser can
+      start downloading them while the bundle is still parsing. Without this the
+      first paint shows fallback fonts and raw Material Symbols ligature names
+      until the stylesheets arrive, which looks like scattered text.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!--
+      `display=block` keeps icon ligature names hidden until the icon font is
+      ready instead of briefly rendering words such as "arrow_forward".
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block"
+      rel="stylesheet"
+    />
+    <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->

@@ -274,7 +274,8 @@ test('Home shows BTC, USDT, and TRX receive shortcuts with chain logos', async (
   fireEvent.click(screen.getByRole('button', { name: 'Receive BTC on Bitcoin' }));
 
   expect(screen.getByRole('dialog')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /BTC Bitcoin/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(within(screen.getByRole('dialog')).getByRole('button', { name: /BTC Bitcoin/ }))
+    .toHaveAttribute('aria-pressed', 'true');
 });
 
 test('portfolio defaults to All Networks and supports an independent chain filter', async () => {
@@ -284,9 +285,11 @@ test('portfolio defaults to All Networks and supports an independent chain filte
     expect(container.querySelector('#portfolio-balance')).toHaveTextContent('$0.00');
   });
   expect(screen.getByRole('button', { name: 'All Networks' })).toHaveAttribute('aria-pressed', 'true');
-  expect(container.querySelectorAll('.token-row')).toHaveLength(1);
+  // Bitcoin is always listed even before it holds a balance; other unfunded
+  // chains stay hidden.
+  expect(container.querySelectorAll('.token-row')).toHaveLength(2);
   expect(container.querySelector('[data-symbol="ETH"]')).toBeInTheDocument();
-  expect(container.querySelector('[data-symbol="BTC"]')).not.toBeInTheDocument();
+  expect(container.querySelector('[data-symbol="BTC"]')).toBeInTheDocument();
   expect(container.querySelector('[data-symbol="SOL"]')).not.toBeInTheDocument();
   expect(screen.queryByText('Balance not connected')).not.toBeInTheDocument();
   expect(screen.getByText(/Balances are combined across every network you have added/i)).toBeInTheDocument();

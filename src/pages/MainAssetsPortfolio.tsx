@@ -131,7 +131,9 @@ const MainAssetsPortfolio: React.FC = () => {
     ...portfolioBalanceNetworks
       .filter((chain) => {
         const balance = chain === network ? nativeBalance ?? multiChainBalances[chain] : multiChainBalances[chain];
-        return chain === network || (balance !== undefined && Number(balance) > 0);
+        // Bitcoin is the headline asset of this wallet, so it is always listed
+        // even before it has a balance. Other chains stay hidden until funded.
+        return chain === 'bitcoin' || chain === network || (balance !== undefined && Number(balance) > 0);
       })
       .map((chain) => {
         const config = walletNetworks[chain];
@@ -549,6 +551,8 @@ const MainAssetsPortfolio: React.FC = () => {
   };
 
   const handleLockWallet = () => {
+    // Fall back to a full password lock for vaults created before the
+    // six-digit code existed.
     if (!lockWithSessionPin()) lockWithPassword();
     navigate('/passcode', { replace: true });
   };
@@ -556,6 +560,7 @@ const MainAssetsPortfolio: React.FC = () => {
   const handleSignOutAccount = () => {
     clearAccountSession();
     setAccountSession(null);
+    lockWithPassword();
     navigate('/account', { replace: true });
   };
 
@@ -614,13 +619,13 @@ const MainAssetsPortfolio: React.FC = () => {
             </div>
             {/* Wallet Selector Pill */}
             <button
-              aria-label="Wallet: Main Wallet 1. Change network"
+              aria-label={`Wallet: ${accountSession?.user.name ? `${accountSession.user.name}'s wallet` : 'Main Wallet 1'}. Change network`}
               className="flex shrink-0 items-center gap-1.5 bg-tw-surface-container/90 hover:bg-tw-surface-container-high active:scale-95 transition-all py-1.5 px-2.5 rounded-full border border-white/[0.06]"
               onClick={() => handleAction('wallets')}
             >
               <span className="inline-flex h-2 w-2 shrink-0 rounded-full bg-tw-primary shadow-[0_0_8px_#3D5AFE] animate-pulse"></span>
-              <span className="whitespace-nowrap font-display font-medium text-[12px] text-tw-on-surface tracking-tight">
-                Main Wallet 1
+              <span className="max-w-[9rem] truncate whitespace-nowrap font-display font-medium text-[12px] text-tw-on-surface tracking-tight">
+                {accountSession?.user.name ? `${accountSession.user.name}'s wallet` : 'Main Wallet 1'}
               </span>
               <span className="material-symbols-outlined text-[16px] text-tw-on-surface-variant">
                 expand_more
@@ -1109,6 +1114,24 @@ const MainAssetsPortfolio: React.FC = () => {
 
             {activePanel === 'wallets' && (
               <div className="space-y-2">
+                {accountSession && (
+                  <div className="mb-3 flex items-center gap-3 rounded-2xl bg-tw-surface-container-low p-4">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-tw-primary/15 font-display text-base font-semibold text-tw-primary">
+                      {(accountSession.user.name || accountSession.user.email).slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-sm font-medium text-tw-on-surface">
+                        {accountSession.user.name || 'Wallet owner'}
+                      </p>
+                      <p className="truncate text-xs text-tw-on-surface-variant">
+                        {accountSession.user.email}
+                      </p>
+                    </div>
+                    <span className="ml-auto shrink-0 rounded-full border border-tw-primary/20 bg-tw-primary/10 px-2 py-0.5 text-[10px] font-medium text-tw-primary">
+                      {accountSession.user.hasPin ? 'Code sign-in' : 'Password sign-in'}
+                    </span>
+                  </div>
+                )}
                 {walletAddress && (
                   <div className="mb-3 rounded-2xl bg-tw-surface-container-low p-4">
                     <p className="text-xs text-tw-on-surface-variant">Wallet address</p>
