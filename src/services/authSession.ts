@@ -22,12 +22,24 @@ const isStoredSession = (value: unknown): value is StoredSession => {
     typeof user.id === 'string' && typeof user.email === 'string' && typeof user.name === 'string';
 };
 
+/** Older sessions were stored before the demo balance existed. */
+const withDefaults = (session: StoredSession): AuthSession => ({
+  token: session.token,
+  user: {
+    ...session.user,
+    hasPin: session.user.hasPin === true,
+    demoPortfolioSpec: typeof session.user.demoPortfolioSpec === 'string'
+      ? session.user.demoPortfolioSpec
+      : '',
+  },
+});
+
 export const readAccountSession = (): AuthSession | null => {
   try {
     const raw = window.sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isStoredSession(parsed) ? parsed : null;
+    return isStoredSession(parsed) ? withDefaults(parsed) : null;
   } catch {
     return null;
   }

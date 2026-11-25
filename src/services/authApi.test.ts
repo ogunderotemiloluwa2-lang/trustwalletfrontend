@@ -21,7 +21,13 @@ test('registers an account through the API and returns its authenticated profile
     name: 'User',
   }, fetcher as typeof fetch)).resolves.toEqual({
     token: 'signed-session-token',
-    user: { id: 'user-1', email: 'user@example.com', name: 'User', hasPin: false },
+    user: {
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+      hasPin: false,
+      demoPortfolioSpec: '',
+    },
   });
   expect(fetcher).toHaveBeenCalledWith(`${API_BASE_URL}/api/auth/register`, expect.objectContaining({
     method: 'POST',
@@ -48,7 +54,13 @@ test('logs in and loads the authenticated profile using a bearer token', async (
     password: 'a secure password',
   }, fetcher as typeof fetch)).resolves.toMatchObject({ token: 'signed-session-token' });
   await expect(fetchAuthenticatedProfile('signed-session-token', fetcher as typeof fetch))
-    .resolves.toEqual({ id: 'user-1', email: 'user@example.com', name: 'User', hasPin: false });
+    .resolves.toEqual({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+      hasPin: false,
+      demoPortfolioSpec: '',
+    });
   expect(fetcher).toHaveBeenLastCalledWith(`${API_BASE_URL}/api/auth/me`, expect.objectContaining({
     headers: { Authorization: 'Bearer signed-session-token', Accept: 'application/json' },
   }));
@@ -89,7 +101,13 @@ test('stores the six-digit code for the signed-in account', async () => {
   });
 
   await expect(setAccountPin('signed-session-token', '123456', fetcher as typeof fetch))
-    .resolves.toEqual({ id: 'user-1', email: 'user@example.com', name: 'User', hasPin: true });
+    .resolves.toEqual({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+      hasPin: true,
+      demoPortfolioSpec: '',
+    });
   expect(fetcher).toHaveBeenCalledWith(`${API_BASE_URL}/api/auth/pin`, expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({ pin: '123456' }),

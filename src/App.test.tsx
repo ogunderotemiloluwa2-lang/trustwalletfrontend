@@ -22,6 +22,19 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
 }));
 
+// The headline balance is the demo balance plus the live wallet value, so the
+// demo rule is pinned to a fixed anchor to keep the assertions deterministic.
+jest.mock('./wallet/demoPortfolio', () => {
+  const actual = jest.requireActual('./wallet/demoPortfolio');
+  return {
+    ...actual,
+    useDemoPortfolio: (specText: string) => {
+      const spec = actual.resolveDemoPortfolioSpec(specText);
+      return { value: 0, spec, growthLabel: actual.describeDemoPortfolio(spec) };
+    },
+  };
+});
+
 jest.mock('./wallet/marketPrices', () => ({
   fetchMarketPrices: jest.fn().mockImplementation((coins: string[]) =>
     Promise.resolve({

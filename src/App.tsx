@@ -20,10 +20,11 @@ const LoadingWalletState = () => (
 );
 
 const OnboardingRoute: React.FC = () => {
-  const { isReady, hasVault, storageError } = useWalletSetup();
+  const { isReady, storageError } = useWalletSetup();
   if (!isReady) return <LoadingWalletState />;
   if (storageError) return <div role="alert" className="p-6 text-error">{storageError}</div>;
-  if (hasVault) return <Navigate to="/passcode" replace />;
+  // Opening the app always starts here so the wallet owner can create a wallet,
+  // add an existing one, or sign in with the six-digit code.
   return <WelcomeOnboarding />;
 };
 

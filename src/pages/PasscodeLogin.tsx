@@ -50,7 +50,14 @@ const PasscodeLogin: React.FC = () => {
     <div className="min-h-screen bg-surface px-4 pb-safe pt-safe text-on-surface">
       <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
         <div className="flex items-center justify-between py-3">
-          <span className="h-10 w-10" aria-hidden="true" />
+          <button
+            aria-label="Back to start"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+            onClick={() => navigate('/onboarding')}
+            type="button"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
           <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
             Encrypted wallet
           </span>

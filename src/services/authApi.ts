@@ -4,6 +4,8 @@ export interface AuthenticatedUser {
   name: string;
   /** True once the account has a six-digit sign-in code stored on the server. */
   hasPin: boolean;
+  /** Demo portfolio spec (`40k,5mins,2%`) saved on the account, if any. */
+  demoPortfolioSpec: string;
 }
 
 export interface AuthSession {
@@ -36,7 +38,13 @@ const parseUser = (value: unknown): AuthenticatedUser => {
       typeof user.name !== 'string') {
     throw new Error('Authentication service returned an invalid user profile.');
   }
-  return { id: user.id, email: user.email, name: user.name, hasPin: user.hasPin === true };
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    hasPin: user.hasPin === true,
+    demoPortfolioSpec: typeof user.demoPortfolioSpec === 'string' ? user.demoPortfolioSpec : '',
+  };
 };
 
 const request = async (
@@ -112,6 +120,31 @@ export const fetchAuthenticatedProfile = async (
   const result: AuthResponse = await response.json();
   if (!response.ok) {
     throw new Error(typeof result.error === 'string' ? result.error : 'Could not load user profile.');
+  }
+  return parseUser(result.user);
+};
+
+/**
+ * Saves the demo portfolio spec (`40k,5mins,2%`) on the account so the
+ * simulated balance follows the wallet owner instead of this browser.
+ */
+export const saveDemoPortfolioSpec = async (
+  token: string,
+  spec: string,
+  fetcher: typeof fetch = fetch
+): Promise<AuthenticatedUser> => {
+  const response = await fetcher(authUrl('demo-portfolio'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ spec }),
+  });
+  const result: AuthResponse = await response.json();
+  if (!response.ok) {
+    throw new Error(typeof result.error === 'string' ? result.error : 'Could not save the demo balance.');
   }
   return parseUser(result.user);
 };

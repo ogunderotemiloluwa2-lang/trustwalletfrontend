@@ -4,7 +4,7 @@ const SESSION_KEY = 'account-session';
 
 const validSession = {
   token: 'header.payload.signature',
-  user: { id: 'user_1', email: 'ada@example.com', name: 'Ada', hasPin: false },
+  user: { id: 'user_1', email: 'ada@example.com', name: 'Ada', hasPin: false, demoPortfolioSpec: '' },
 };
 
 describe('account session storage', () => {

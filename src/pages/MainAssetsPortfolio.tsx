@@ -21,7 +21,15 @@ import type { WalletNetwork as ChainId } from '../wallet/chainRegistry';
 import { QRCodeSVG } from 'qrcode.react';
 import { isValidRecipientAddress, readNetworkFee, validateNativeAmount } from '../wallet/sendSupport';
 import type { NetworkFeeQuote } from '../wallet/sendSupport';
-import { clearAccountSession, readAccountSession } from '../services/authSession';
+import { clearAccountSession, readAccountSession, saveAccountSession } from '../services/authSession';
+import { saveDemoPortfolioSpec } from '../services/authApi';
+import {
+  describeDemoPortfolio,
+  parseDemoPortfolioSpec,
+  readDemoPortfolioSpec,
+  useDemoPortfolio,
+  writeDemoPortfolioSpec,
+} from '../wallet/demoPortfolio';
 
 const portfolioBalanceNetworks = walletNetworkIds.filter((id) => {
   const config = walletNetworks[id];
@@ -65,6 +73,12 @@ const MainAssetsPortfolio: React.FC = () => {
   } = useWalletSetup();
   const [isPrivacyActive, setIsPrivacyActive] = useState(false);
   const [accountSession, setAccountSession] = useState(() => readAccountSession());
+  const demoScope = accountSession?.user.id ?? '';
+  const [demoSpec, setDemoSpec] = useState(() => readDemoPortfolioSpec(demoScope));
+  const [demoSpecDraft, setDemoSpecDraft] = useState('');
+  const [demoSpecError, setDemoSpecError] = useState('');
+  const [demoSpecSaved, setDemoSpecSaved] = useState(false);
+  const [demoSpecSaving, setDemoSpecSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'crypto' | 'nfts'>('crypto');
   const [portfolioNetwork, setPortfolioNetwork] = useState<'all' | WalletNetwork>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -446,6 +460,15 @@ const MainAssetsPortfolio: React.FC = () => {
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [activePanel]);
 
+  // The account is the source of truth for the demo rule, so a spec saved on
+  // another device is picked up as soon as the session is restored.
+  useEffect(() => {
+    const stored = accountSession?.user.demoPortfolioSpec;
+    if (!stored || !parseDemoPortfolioSpec(stored)) return;
+    setDemoSpec(stored);
+    writeDemoPortfolioSpec(stored, demoScope);
+  }, [accountSession, demoScope]);
+
   const handleSendPreview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isValidRecipientAddress(recipientAddress, network)) {
@@ -599,6 +622,41 @@ const MainAssetsPortfolio: React.FC = () => {
     : null;
   const unpricedTokenCount = portfolioTokenBalances.filter(({ balance }) => balance.priceUsd === null).length;
 
+  // The headline balance is the demo balance plus whatever the wallet really
+  // holds, so the simulated growth is visible even on an empty wallet.
+  const demoPortfolio = useDemoPortfolio(demoSpec, demoScope);
+  const headlineValue = demoPortfolio.value + (Number.isFinite(portfolioValue) ? portfolioValue : 0);
+  const formattedHeadlineValue = formatUsd(headlineValue);
+
+  const applyDemoSpec = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const parsed = parseDemoPortfolioSpec(demoSpecDraft);
+    if (!parsed) {
+      setDemoSpecError('Use amount,interval,rate — for example 40k,5mins,2%.');
+      setDemoSpecSaved(false);
+      return;
+    }
+    const normalized = demoSpecDraft.trim();
+    setDemoSpecError('');
+    setDemoSpec(normalized);
+    writeDemoPortfolioSpec(normalized, demoScope);
+    setDemoSpecDraft('');
+    setDemoSpecSaved(true);
+    if (!accountSession) return;
+    setDemoSpecSaving(true);
+    try {
+      const user = await saveDemoPortfolioSpec(accountSession.token, normalized);
+      const session = { token: accountSession.token, user };
+      saveAccountSession(session);
+      setAccountSession(session);
+    } catch {
+      // The balance already uses the new spec locally; the account copy can be
+      // retried on the next change.
+    } finally {
+      setDemoSpecSaving(false);
+    }
+  };
+
   const toggleTokenVisibility = (tokenId: string) => {
     setHiddenTokenIds((hidden) =>
       hidden.includes(tokenId)
@@ -720,15 +778,7 @@ const MainAssetsPortfolio: React.FC = () => {
                   >
                     {isPrivacyActive
                       ? hiddenBalance
-                      : formattedPortfolioValue && (
-                        marketPricesUpdatedAt !== null ||
-                        (!marketPriceError && !balanceError && !multiChainBalanceError &&
-                          (balanceLoading || multiChainBalancesLoading || !marketPrices))
-                      )
-                        ? formattedPortfolioValue
-                        : marketPriceError || balanceError || multiChainBalanceError
-                          ? '—'
-                          : 'Loading…'}
+                      : formattedHeadlineValue}
                   </span>
                   <span className="font-display font-normal text-[11px] text-tw-on-surface-variant">
                     USD
@@ -741,6 +791,15 @@ const MainAssetsPortfolio: React.FC = () => {
                       : unpricedTokenCount > 0
                         ? `Known market value · ${unpricedTokenCount} token${unpricedTokenCount === 1 ? '' : 's'} missing a price`
                         : 'Wallet value · balances and prices across your networks')}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-tw-primary/20 bg-tw-primary/10 px-2 py-0.5 text-[10px] font-medium text-tw-primary">
+                    <span className="material-symbols-outlined text-[12px]">trending_up</span>
+                    {demoPortfolio.growthLabel}
+                  </span>
+                  <span className="text-[10px] text-tw-on-surface-variant">
+                    {`Demo balance ${formatUsd(demoPortfolio.spec.baseAmount)} · live wallet value ${formattedPortfolioValue ?? '—'}`}
                   </span>
                 </div>
                 {isTestNetwork && formattedBalance && (
@@ -1503,6 +1562,46 @@ const MainAssetsPortfolio: React.FC = () => {
 
             {activePanel === 'settings' && (
               <div className="space-y-4">
+                <form className="space-y-3 rounded-2xl border border-tw-primary/20 p-4" onSubmit={applyDemoSpec}>
+                  <h3 className="text-sm font-medium text-tw-on-surface">Demo balance</h3>
+                  <p className="text-xs leading-5 text-tw-on-surface-variant">
+                    Type the starting amount, the interval and the growth rate — for example
+                    {' '}<code className="text-tw-primary">40k,5mins,2%</code>. Growth only runs Monday to Friday.
+                  </p>
+                  <label className="block text-xs text-tw-on-surface-variant" htmlFor="demo-portfolio-spec">
+                    Amount, interval, rate
+                    <input
+                      autoComplete="off"
+                      className="mt-2 w-full rounded-xl bg-tw-surface-container-low p-3 text-sm text-tw-on-surface"
+                      id="demo-portfolio-spec"
+                      onChange={(event) => {
+                        setDemoSpecDraft(event.target.value);
+                        setDemoSpecError('');
+                        setDemoSpecSaved(false);
+                      }}
+                      placeholder={demoSpec}
+                      spellCheck={false}
+                      type="text"
+                      value={demoSpecDraft}
+                    />
+                  </label>
+                  {demoSpecError && <p className="text-xs text-tw-loss">{demoSpecError}</p>}
+                  {!demoSpecError && demoSpecSaved && (
+                    <p className="text-xs text-tw-primary">
+                      {demoSpecSaving ? 'Saving to your account…' : 'Saved. Your balance now follows this rule.'}
+                    </p>
+                  )}
+                  <p className="text-xs text-tw-on-surface-variant">
+                    {`Active: ${describeDemoPortfolio(demoPortfolio.spec)}`}
+                  </p>
+                  <button
+                    className="w-full rounded-xl bg-tw-primary px-4 py-3 text-sm font-medium text-tw-on-primary disabled:opacity-60"
+                    disabled={demoSpecSaving || demoSpecDraft.trim().length === 0}
+                    type="submit"
+                  >
+                    Apply demo balance
+                  </button>
+                </form>
                 <p className="rounded-2xl bg-tw-surface-container-low p-4 text-sm text-tw-on-surface-variant">
                   Deleting your wallet removes it from this device. Your funds stay on the blockchain — make sure your recovery phrase is backed up first.
                 </p>
