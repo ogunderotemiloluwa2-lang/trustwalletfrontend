@@ -51,13 +51,20 @@ const AccountAuth: React.FC = () => {
     <div className="min-h-screen bg-surface px-4 pb-safe pt-safe text-on-surface">
       <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
         <div className="flex items-center justify-between py-3">
-          <button
-            aria-label="Go back"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface"
-            onClick={() => navigate('/onboarding')}
-          >
-            <span className="material-symbols-outlined text-xl">arrow_back</span>
-          </button>
+          {hasVault ? (
+            // With a wallet on this device there is no setup flow to go back to,
+            // so the arrow is left out rather than bouncing back to this screen.
+            <span className="h-10 w-10" aria-hidden="true" />
+          ) : (
+            <button
+              aria-label="Go back"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface"
+              onClick={() => navigate('/onboarding')}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-xl">arrow_back</span>
+            </button>
+          )}
           <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
             Sign in
           </span>

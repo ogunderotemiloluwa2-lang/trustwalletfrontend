@@ -30,6 +30,10 @@ requires a rebuild.
 - Signing in happens once per device. Afterwards the app opens straight on the
   six-digit code screen, and the password is only needed on a new device or
   after signing out.
+- A forgotten code is reset from the code screen: the wallet password is checked
+  against MongoDB, then the new code is saved to the account with
+  `POST /api/auth/pin`. The back arrow on the code screen signs out on this
+  device and returns to the password screen.
 - Once an account exists the app opens on the sign-in screen, never on wallet
   setup again.
 - The headline balance is stored on the account, so it is the same on every

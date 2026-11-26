@@ -65,6 +65,8 @@ interface WalletSetupContextValue {
    * device, so a stale local copy can never reject a valid code.
    */
   unlockWithVerifiedPin: (pin: string) => Promise<boolean>;
+  /** Replaces the code remembered on this device after a reset. */
+  updateSessionPin: (pin: string) => void;
   lockWithSessionPin: () => boolean;
   lockWithPassword: () => void;
   discardPendingWallet: () => void;
@@ -300,6 +302,11 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     return true;
   }, [wallet]);
 
+  const updateSessionPin = useCallback((pin: string) => {
+    setSessionPin(pin);
+    rememberSessionPin(pin);
+  }, []);
+
   const lockWithSessionPin = useCallback(() => {
     if (!sessionPin) return false;
     // An explicit lock must survive a refresh, so remember that the user locked
@@ -371,6 +378,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
       completeSetup,
       unlockWithPassword,
       unlockWithVerifiedPin,
+      updateSessionPin,
       lockWithSessionPin,
       lockWithPassword,
       discardPendingWallet,
@@ -380,7 +388,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     [
       address, receiveAddresses, mnemonic, isReady, hasVault, pendingWallet, isUnlocked, sessionPin, network, storageError,
       createWallet, importWallet, completeSetup, unlockWithPassword,
-      unlockWithVerifiedPin, lockWithSessionPin, lockWithPassword,
+      unlockWithVerifiedPin, updateSessionPin, lockWithSessionPin, lockWithPassword,
       discardPendingWallet, deleteVault, selectNetwork,
     ]
   );
