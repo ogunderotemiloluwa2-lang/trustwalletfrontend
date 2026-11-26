@@ -59,7 +59,12 @@ interface WalletSetupContextValue {
   importWallet: (phrase: string) => string;
   completeSetup: (password: string, pin: string, identity: WalletOwnerIdentity) => Promise<void>;
   unlockWithPassword: (password: string) => Promise<void>;
-  unlockWithSessionPin: (pin: string) => boolean;
+  /**
+   * Opens the vault with a code the server has already verified against the
+   * account in MongoDB. The verified code becomes the code remembered on this
+   * device, so a stale local copy can never reject a valid code.
+   */
+  unlockWithVerifiedPin: (pin: string) => Promise<boolean>;
   lockWithSessionPin: () => boolean;
   lockWithPassword: () => void;
   discardPendingWallet: () => void;
@@ -266,35 +271,34 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     setIsUnlocked(true);
   }, []);
 
-  const unlockWithSessionPin = useCallback((pin: string) => {
-    if (!sessionPin || pin !== sessionPin) return false;
+  const unlockWithVerifiedPin = useCallback(async (pin: string) => {
+    // The server has already checked this code against the account in MongoDB,
+    // so it is the code for this wallet: remember it and drop any stale copy.
+    setSessionPin(pin);
+    rememberSessionPin(pin);
     // The remembered password re-opens the vault when the signer is not in
     // memory yet, for example in a new tab or after a browser restart.
     if (!wallet) {
       const rememberedPassword = readRememberedUnlock();
       if (!rememberedPassword) return false;
-      void readEncryptedKeystore()
-        .then((encryptedJson) => {
-          if (!encryptedJson) return null;
-          return unlockEncryptedWallet(encryptedJson, rememberedPassword);
-        })
-        .then((restoredWallet) => {
-          if (!restoredWallet) return;
-          setWallet(restoredWallet);
-          setAddress(restoredWallet.address);
-          setIsUnlocked(true);
-        })
-        .catch(() => {
-          // The remembered password no longer opens the vault; the owner has to
-          // sign in again with the wallet password.
-          forgetUnlock();
-        });
+      try {
+        const encryptedJson = await readEncryptedKeystore();
+        if (!encryptedJson) return false;
+        const restoredWallet = await unlockEncryptedWallet(encryptedJson, rememberedPassword);
+        setWallet(restoredWallet);
+        setAddress(restoredWallet.address);
+      } catch {
+        // The remembered password no longer opens the vault; the owner has to
+        // sign in again with the wallet password.
+        forgetUnlock();
+        return false;
+      }
     }
     clearSessionLocked();
     markSessionActivity();
     setIsUnlocked(true);
     return true;
-  }, [sessionPin, wallet]);
+  }, [wallet]);
 
   const lockWithSessionPin = useCallback(() => {
     if (!sessionPin) return false;
@@ -366,7 +370,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
       importWallet,
       completeSetup,
       unlockWithPassword,
-      unlockWithSessionPin,
+      unlockWithVerifiedPin,
       lockWithSessionPin,
       lockWithPassword,
       discardPendingWallet,
@@ -376,7 +380,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     [
       address, receiveAddresses, mnemonic, isReady, hasVault, pendingWallet, isUnlocked, sessionPin, network, storageError,
       createWallet, importWallet, completeSetup, unlockWithPassword,
-      unlockWithSessionPin, lockWithSessionPin, lockWithPassword,
+      unlockWithVerifiedPin, lockWithSessionPin, lockWithPassword,
       discardPendingWallet, deleteVault, selectNetwork,
     ]
   );

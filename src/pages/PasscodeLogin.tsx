@@ -2,28 +2,57 @@ import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TrustShield from '../components/common/TrustShield';
 import PinInput from '../components/common/PinInput';
+import { loginAccount } from '../services/authApi';
+import { saveAccountSession } from '../services/authSession';
 import { useWalletSetup } from '../wallet/WalletSetupContext';
+
+/** How long the round spinner stays up once the code is accepted. */
+const UNLOCK_SPINNER_MS = 2500;
 
 /**
  * Opens the encrypted wallet. The six-digit code is the only credential here:
  * the wallet password is used once to sign in, and the recovery phrase restores
  * the account on a new device.
+ *
+ * The code is verified against the account stored in MongoDB, so it works on
+ * any device the owner signs in on, not just the one that created the wallet.
  */
 const PasscodeLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { unlockWithSessionPin } = useWalletSetup();
+  const { unlockWithVerifiedPin } = useWalletSetup();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const submitPin = (event: FormEvent<HTMLFormElement>) => {
+  const submitPin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy) return;
     setError('');
-    if (unlockWithSessionPin(pin)) {
+    setBusy(true);
+    try {
+      // The server holds the authoritative hash of the code, so the account is
+      // signed in with it before the local vault is opened.
+      const session = await loginAccount({ pin });
+      saveAccountSession(session);
+      const opened = await unlockWithVerifiedPin(pin);
+      if (!opened) {
+        setError('This device cannot open the wallet with that code. Sign in with your wallet password.');
+        setPin('');
+        return;
+      }
       setPin('');
+      // Hold the round spinner briefly so the unlock reads as a deliberate step.
+      await new Promise((resolve) => setTimeout(resolve, UNLOCK_SPINNER_MS));
       navigate('/portfolio', { replace: true });
-    } else {
-      setError('Incorrect six-digit code.');
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'The six-digit code could not be verified.'
+      );
       setPin('');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -58,17 +87,24 @@ const PasscodeLogin: React.FC = () => {
         <form className="mt-8" onSubmit={submitPin}>
           <PinInput
             autoFocus
+            disabled={busy}
             id="wallet-unlock-pin"
             label="Six-digit code"
             onChange={setPin}
             value={pin}
           />
           <button
-            className="mt-5 w-full rounded-full bg-primary-container py-3.5 text-sm font-medium text-white disabled:opacity-50"
-            disabled={pin.length !== 6}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary-container py-3.5 text-sm font-medium text-white disabled:opacity-50"
+            disabled={busy || pin.length !== 6}
             type="submit"
           >
-            Unlock wallet
+            {busy && (
+              <span
+                aria-hidden="true"
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+              />
+            )}
+            {busy ? 'Opening your wallet…' : 'Unlock wallet'}
           </button>
         </form>
 

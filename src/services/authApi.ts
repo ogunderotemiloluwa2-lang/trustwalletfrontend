@@ -21,6 +21,20 @@ interface AuthResponse {
 }
 
 /**
+ * Authentication failure that keeps the HTTP status, so callers can tell a
+ * rejected credential apart from an unreachable service.
+ */
+export class AuthRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'AuthRequestError';
+    this.status = status;
+  }
+}
+
+/**
  * Base URL of the authentication API. In development this falls back to the
  * local backend; in production it must be set to the deployed backend origin
  * (for example `https://trustwalletbackend.onrender.com`) because the frontend
@@ -58,7 +72,10 @@ const request = async (
   });
   const result: AuthResponse = await response.json();
   if (!response.ok) {
-    throw new Error(typeof result.error === 'string' ? result.error : 'Authentication request failed.');
+    throw new AuthRequestError(
+      typeof result.error === 'string' ? result.error : 'Authentication request failed.',
+      response.status
+    );
   }
   if (typeof result.token !== 'string') {
     throw new Error('Authentication service did not return a session token.');
