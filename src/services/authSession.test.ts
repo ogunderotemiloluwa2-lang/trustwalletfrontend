@@ -9,7 +9,7 @@ const validSession = {
 
 describe('account session storage', () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   it('returns null when nothing has been stored', () => {
@@ -22,12 +22,12 @@ describe('account session storage', () => {
   });
 
   it('ignores malformed JSON instead of throwing', () => {
-    window.sessionStorage.setItem(SESSION_KEY, '{not json');
+    window.localStorage.setItem(SESSION_KEY, '{not json');
     expect(readAccountSession()).toBeNull();
   });
 
   it('ignores a stored value with a missing or invalid shape', () => {
-    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'abc' }));
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'abc' }));
     expect(readAccountSession()).toBeNull();
 
     window.sessionStorage.setItem(

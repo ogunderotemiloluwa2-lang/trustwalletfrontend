@@ -2,11 +2,12 @@ import { AuthenticatedUser, AuthSession } from './authApi';
 import { normalizeAccountBalance } from '../wallet/portfolioBalance';
 
 /**
- * Holds the signed-in account for the current tab only.
+ * Holds the signed-in account so the owner signs in once per device.
  *
- * Account data lives in MongoDB and is re-verified against the API, so nothing
- * is written to `localStorage`. `sessionStorage` keeps the session alive across
- * a refresh in the same tab while still ending it when the tab is closed.
+ * Account data lives in MongoDB and is re-verified against the API. The session
+ * is kept in `localStorage` so a returning owner only has to enter the
+ * six-digit code to open the wallet; signing in with the password is only
+ * needed on a new device or after signing out.
  */
 const SESSION_KEY = 'account-session';
 
@@ -35,7 +36,7 @@ const withDefaults = (session: StoredSession): AuthSession => ({
 
 export const readAccountSession = (): AuthSession | null => {
   try {
-    const raw = window.sessionStorage.getItem(SESSION_KEY);
+    const raw = window.localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     return isStoredSession(parsed) ? withDefaults(parsed) : null;
@@ -46,7 +47,7 @@ export const readAccountSession = (): AuthSession | null => {
 
 export const saveAccountSession = (session: AuthSession): void => {
   try {
-    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   } catch {
     // A full or blocked storage quota must not break a successful sign-in.
   }
@@ -54,7 +55,7 @@ export const saveAccountSession = (session: AuthSession): void => {
 
 export const clearAccountSession = (): void => {
   try {
-    window.sessionStorage.removeItem(SESSION_KEY);
+    window.localStorage.removeItem(SESSION_KEY);
   } catch {
     // Ignore storage failures on sign-out.
   }

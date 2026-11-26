@@ -25,16 +25,19 @@ requires a rebuild.
 - Account data (display name, password hash, six-digit code hash, headline
   balance, wallet records) lives in MongoDB. Nothing about the user is written to
   `localStorage`.
-- Creating a wallet asks for a wallet password **and** a six-digit sign-in code.
-  The code is hashed on the server, so afterwards the account is signed in with
-  the six-digit code instead of the password.
+- Creating a wallet asks for a wallet password **and** a six-digit code. The
+  password signs the account in; the code opens the encrypted wallet.
+- Signing in happens once per device. Afterwards the app opens straight on the
+  six-digit code screen, and the password is only needed on a new device or
+  after signing out.
 - Once an account exists the app opens on the sign-in screen, never on wallet
   setup again.
 - The headline balance is stored on the account, so it is the same on every
   device and is never reset by signing out or by removing a wallet from a device.
   It stays at `$0` until an amount is set in Settings.
-- The session token and the tab-scoped unlock state use `sessionStorage`, so a
-  page refresh keeps the user signed in while closing the tab clears it.
+- The session token and the remembered unlock state use `localStorage`, so the
+  owner keeps signing in once per device; the lock flag and the idle clock use
+  `sessionStorage`, so a fresh tab starts locked.
 - Every password input has a show/hide toggle.
 
 ## Tests

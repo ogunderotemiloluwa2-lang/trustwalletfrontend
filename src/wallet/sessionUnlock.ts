@@ -1,11 +1,14 @@
 /**
- * Keeps the wallet unlocked across a page refresh without weakening the
+ * Keeps the wallet openable with the six-digit code without weakening the
  * encrypted keystore.
  *
- * The wallet password is held in `sessionStorage`, which is scoped to a single
- * tab and discarded when that tab closes. A refresh therefore restores the
- * unlocked session, while a new tab or a reopened browser still requires the
- * password. Nothing is ever written to `localStorage` or to disk.
+ * The wallet password and the six-digit code live in `localStorage` so the
+ * owner signs in once and afterwards only ever enters the code to open the
+ * wallet, even in a new tab or after restarting the browser. The password is
+ * still required to decrypt the keystore, so the code alone never exposes it.
+ *
+ * The lock flag and the idle clock stay in `sessionStorage`: they describe the
+ * current tab, and a fresh tab must start locked.
  */
 const UNLOCK_KEY = 'wallet-session-unlock';
 const LOCKED_KEY = 'wallet-session-locked';
@@ -15,17 +18,20 @@ const ACTIVITY_KEY = 'wallet-session-activity';
 /** The wallet locks itself after this much inactivity. */
 export const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
 
+/** Storage that survives a tab close, so the code keeps working after a restart. */
+const persistentStorage = (): Storage => window.localStorage;
+
 export const rememberUnlock = (password: string): void => {
   try {
-    window.sessionStorage.setItem(UNLOCK_KEY, password);
+    persistentStorage().setItem(UNLOCK_KEY, password);
   } catch {
-    // A blocked or full session storage must not break unlocking.
+    // A blocked or full storage must not break unlocking.
   }
 };
 
 export const readRememberedUnlock = (): string | null => {
   try {
-    return window.sessionStorage.getItem(UNLOCK_KEY);
+    return persistentStorage().getItem(UNLOCK_KEY);
   } catch {
     return null;
   }
@@ -33,7 +39,7 @@ export const readRememberedUnlock = (): string | null => {
 
 export const forgetUnlock = (): void => {
   try {
-    window.sessionStorage.removeItem(UNLOCK_KEY);
+    persistentStorage().removeItem(UNLOCK_KEY);
   } catch {
     // Ignore storage failures while locking.
   }
@@ -69,21 +75,21 @@ export const clearSessionLocked = (): void => {
 };
 
 /**
- * Remembers the six-digit code for the current tab so a refresh does not force
- * the user to retype it. The code is never written to `localStorage`; the
- * authoritative copy is the bcrypt hash stored in MongoDB.
+ * Remembers the six-digit code so the owner only ever enters it to open the
+ * wallet, in this tab and in later ones. The code is never written to the
+ * server; the authoritative copy is the bcrypt hash stored in MongoDB.
  */
 export const rememberSessionPin = (pin: string): void => {
   try {
-    window.sessionStorage.setItem(PIN_KEY, pin);
+    persistentStorage().setItem(PIN_KEY, pin);
   } catch {
-    // A blocked or full session storage must not break wallet creation.
+    // A blocked or full storage must not break wallet creation.
   }
 };
 
 export const readSessionPin = (): string | null => {
   try {
-    return window.sessionStorage.getItem(PIN_KEY);
+    return persistentStorage().getItem(PIN_KEY);
   } catch {
     return null;
   }
@@ -91,7 +97,7 @@ export const readSessionPin = (): string | null => {
 
 export const forgetSessionPin = (): void => {
   try {
-    window.sessionStorage.removeItem(PIN_KEY);
+    persistentStorage().removeItem(PIN_KEY);
   } catch {
     // Ignore storage failures while locking.
   }

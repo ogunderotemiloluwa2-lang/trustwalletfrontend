@@ -98,17 +98,15 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
         }
 
         // A refresh inside the same tab should not force the user to sign in
-        // again, so re-open the vault with the password kept for this tab.
-        // An explicit lock keeps the wallet closed until the six-digit code is
-        // entered, but the signer is still restored so that code can unlock it.
+        // again, so re-open the vault with the password kept for this device.
+        // An explicit lock or an idle timeout keeps the wallet closed until the
+        // six-digit code is entered, but the signer is still restored so that
+        // code can unlock it.
         const rememberedPassword = keystore ? readRememberedUnlock() : null;
         if (!rememberedPassword) return;
         // Coming back after the idle timeout must not silently restore the
         // session, so the wallet stays locked until the code is entered again.
-        if (isSessionIdle()) {
-          markSessionLocked();
-          return;
-        }
+        if (isSessionIdle()) markSessionLocked();
         try {
           const restoredWallet = await unlockEncryptedWallet(keystore as string, rememberedPassword);
           if (!active) return;
@@ -269,7 +267,29 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
   }, []);
 
   const unlockWithSessionPin = useCallback((pin: string) => {
-    if (!sessionPin || pin !== sessionPin || !wallet) return false;
+    if (!sessionPin || pin !== sessionPin) return false;
+    // The remembered password re-opens the vault when the signer is not in
+    // memory yet, for example in a new tab or after a browser restart.
+    if (!wallet) {
+      const rememberedPassword = readRememberedUnlock();
+      if (!rememberedPassword) return false;
+      void readEncryptedKeystore()
+        .then((encryptedJson) => {
+          if (!encryptedJson) return null;
+          return unlockEncryptedWallet(encryptedJson, rememberedPassword);
+        })
+        .then((restoredWallet) => {
+          if (!restoredWallet) return;
+          setWallet(restoredWallet);
+          setAddress(restoredWallet.address);
+          setIsUnlocked(true);
+        })
+        .catch(() => {
+          // The remembered password no longer opens the vault; the owner has to
+          // sign in again with the wallet password.
+          forgetUnlock();
+        });
+    }
     clearSessionLocked();
     markSessionActivity();
     setIsUnlocked(true);
@@ -277,13 +297,13 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
   }, [sessionPin, wallet]);
 
   const lockWithSessionPin = useCallback(() => {
-    if (!sessionPin || !wallet) return false;
+    if (!sessionPin) return false;
     // An explicit lock must survive a refresh, so remember that the user locked
     // the wallet even though the password stays available for the code unlock.
     markSessionLocked();
     setIsUnlocked(false);
     return true;
-  }, [sessionPin, wallet]);
+  }, [sessionPin]);
 
   const lockWithPassword = useCallback(() => {
     forgetUnlock();

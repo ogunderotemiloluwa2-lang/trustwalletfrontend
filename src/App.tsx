@@ -12,6 +12,7 @@ import AccountAuth from './pages/AccountAuth';
 import { WalletSetupProvider } from './wallet/WalletSetupContext';
 import SecureWalletSetup from './pages/SecureWalletSetup';
 import { useWalletSetup } from './wallet/WalletSetupContext';
+import { readAccountSession } from './services/authSession';
 
 const LoadingWalletState = () => (
   <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center text-sm text-on-surface-variant">
@@ -59,6 +60,9 @@ const AccountRoute: React.FC = () => {
   const { isReady, isUnlocked } = useWalletSetup();
   if (!isReady) return <LoadingWalletState />;
   if (isUnlocked) return <Navigate to="/portfolio" replace />;
+  // Signing in is a one-off per device: an owner who already signed in only
+  // enters the six-digit code to open the wallet.
+  if (readAccountSession()) return <Navigate to="/passcode" replace />;
   return <AccountAuth />;
 };
 
