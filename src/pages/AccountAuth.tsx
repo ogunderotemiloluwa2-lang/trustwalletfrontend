@@ -10,14 +10,14 @@ import { useWalletSetup } from '../wallet/WalletSetupContext';
  * Sign-in for an account that already owns a wallet. Accounts are created as
  * part of wallet setup, so there is no separate "create account" flow here.
  *
- * The six-digit code is the only credential asked for here. The wallet password
- * stays available on the unlock screen for owners who forgot their code, and
- * the recovery phrase restores an account on a new device.
+ * The wallet password signs the owner in. Opening the encrypted wallet is a
+ * separate step: the six-digit code unlocks it on the passcode screen, and the
+ * recovery phrase restores the account on a new device.
  */
 const AccountAuth: React.FC = () => {
   const navigate = useNavigate();
-  const { hasVault, unlockWithSessionPin } = useWalletSetup();
-  const [pin, setPin] = useState('');
+  const { hasVault } = useWalletSetup();
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -26,14 +26,12 @@ const AccountAuth: React.FC = () => {
     setError('');
     setBusy(true);
     try {
-      const session = await loginAccount({ pin });
+      const session = await loginAccount({ password });
       saveAccountSession(session);
-      setPin('');
-      // The six-digit code is the single sign-in step: when the vault on this
-      // device already knows that code, the wallet opens straight away.
-      if (hasVault && unlockWithSessionPin(pin)) {
-        navigate('/portfolio', { replace: true });
-      } else if (hasVault) {
+      setPassword('');
+      // Signing in never opens the vault on its own: the six-digit code does
+      // that on the passcode screen.
+      if (hasVault) {
         navigate('/passcode', { replace: true });
       } else {
         navigate('/onboarding', { replace: true });
@@ -72,32 +70,28 @@ const AccountAuth: React.FC = () => {
           </div>
           <h1 className="text-[22px] font-medium leading-7">Welcome back</h1>
           <p className="mt-2 max-w-xs text-sm leading-5 text-on-surface-variant">
-            Enter the six-digit code you chose when you created your wallet.
+            Sign in with your wallet password, then open the wallet with your six-digit code.
           </p>
         </div>
 
         <form className="mt-6" onSubmit={submit}>
           <label
             className="block text-sm text-on-surface-variant"
-            htmlFor="account-pin"
+            htmlFor="account-password"
           >
-            Six-digit code
+            Wallet password
           </label>
           <PasswordField
-            autoComplete="one-time-code"
+            autoComplete="current-password"
             autoFocus
-            id="account-pin"
-            inputClassName="text-center text-lg tracking-[0.5em]"
-            inputMode="numeric"
-            label="six-digit code"
-            maxLength={6}
-            onChange={(value) => setPin(value.replace(/\D/g, ''))}
-            pattern="\d{6}"
+            id="account-password"
+            label="wallet password"
+            onChange={setPassword}
             required
-            value={pin}
+            value={password}
           />
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-            Use the six-digit code you chose when you created your wallet.
+            Use the wallet password you chose when you created your wallet.
           </p>
 
           <button
@@ -112,16 +106,8 @@ const AccountAuth: React.FC = () => {
         {error && <p aria-live="polite" className="mt-3 text-center text-sm text-error">{error}</p>}
 
         <p className="mt-6 text-center text-xs leading-5 text-on-surface-variant">
-          Forgot the code? Unlock with your wallet password, or restore the account with your recovery phrase.
+          Forgot the password? Restore the account with your recovery phrase.
         </p>
-
-        <button
-          className="mt-2 text-sm text-primary"
-          onClick={() => navigate('/passcode')}
-          type="button"
-        >
-          Use wallet password instead
-        </button>
 
         <button
           className="mt-2 text-sm text-primary"
