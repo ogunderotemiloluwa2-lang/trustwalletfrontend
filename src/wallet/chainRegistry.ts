@@ -16,6 +16,8 @@ export interface ChainConfig {
 }
 
 const chainRegistry = {
+  // Bitcoin leads every chain list in the app, so it is declared first.
+  bitcoin: { label: 'Bitcoin', symbol: 'BTC', family: 'utxo', derivationPath: "m/84'/0'/0'/0/0", addressKey: 'bitcoin', marketCoinId: 'bitcoin' },
   ethereum: {
     label: 'Ethereum Mainnet',
     symbol: 'ETH',
@@ -209,7 +211,6 @@ const chainRegistry = {
     rpcUrl: 'https://rpc.ftm.tools',
     marketCoinId: 'fantom',
   },
-  bitcoin: { label: 'Bitcoin', symbol: 'BTC', family: 'utxo', derivationPath: "m/84'/0'/0'/0/0", addressKey: 'bitcoin', marketCoinId: 'bitcoin' },
   litecoin: { label: 'Litecoin', symbol: 'LTC', family: 'utxo', derivationPath: "m/84'/2'/0'/0/0", addressKey: 'litecoin', marketCoinId: 'litecoin' },
   dogecoin: { label: 'Dogecoin', symbol: 'DOGE', family: 'utxo', derivationPath: "m/44'/3'/0'/0/0", addressKey: 'dogecoin', marketCoinId: 'dogecoin' },
   bitcoinCash: { label: 'Bitcoin Cash', symbol: 'BCH', family: 'utxo', derivationPath: "m/44'/145'/0'/0/0", addressKey: 'bitcoinCash', marketCoinId: 'bitcoin-cash' },

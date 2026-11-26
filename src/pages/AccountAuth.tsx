@@ -12,8 +12,7 @@ import { useWalletSetup } from '../wallet/WalletSetupContext';
  */
 const AccountAuth: React.FC = () => {
   const navigate = useNavigate();
-  const { hasVault } = useWalletSetup();
-  const [email, setEmail] = useState('');
+  const { hasVault, unlockWithSessionPin } = useWalletSetup();
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [usePassword, setUsePassword] = useState(false);
@@ -26,20 +25,19 @@ const AccountAuth: React.FC = () => {
     setBusy(true);
     try {
       const session = usePassword
-        ? await loginAccount({ email, password })
-        : await loginAccount({ email, pin });
+        ? await loginAccount({ password })
+        : await loginAccount({ pin });
       saveAccountSession(session);
       setPassword('');
       setPin('');
-      // Without a wallet vault the portfolio route redirects back to onboarding,
-      // so send the user there directly.
-      if (hasVault) {
+      // The six-digit code is the single sign-in step: when the vault on this
+      // device already knows that code, the wallet opens straight away.
+      if (hasVault && !usePassword && unlockWithSessionPin(pin)) {
         navigate('/portfolio', { replace: true });
+      } else if (hasVault) {
+        navigate('/passcode', { replace: true });
       } else {
-        navigate('/onboarding', {
-          replace: true,
-          state: { accountEmail: session.user.email },
-        });
+        navigate('/onboarding', { replace: true });
       }
     } catch (submitError) {
       setError(
@@ -75,27 +73,13 @@ const AccountAuth: React.FC = () => {
           </div>
           <h1 className="text-[22px] font-medium leading-7">Welcome back</h1>
           <p className="mt-2 max-w-xs text-sm leading-5 text-on-surface-variant">
-            Enter your email and the six-digit code you chose when you created your wallet.
+            Enter the six-digit code you chose when you created your wallet.
           </p>
         </div>
 
         <form className="mt-6" onSubmit={submit}>
-          <label className="block text-sm text-on-surface-variant" htmlFor="account-email">
-            Email
-          </label>
-          <input
-            autoComplete="email"
-            autoFocus
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface"
-            id="account-email"
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            type="email"
-            value={email}
-          />
-
           <label
-            className="mt-4 block text-sm text-on-surface-variant"
+            className="block text-sm text-on-surface-variant"
             htmlFor={usePassword ? 'account-password' : 'account-pin'}
           >
             {usePassword ? 'Password' : 'Six-digit code'}
@@ -103,6 +87,7 @@ const AccountAuth: React.FC = () => {
           {usePassword ? (
             <PasswordField
               autoComplete="current-password"
+              autoFocus
               id="account-password"
               label="password"
               onChange={setPassword}
@@ -112,6 +97,7 @@ const AccountAuth: React.FC = () => {
           ) : (
             <PasswordField
               autoComplete="one-time-code"
+              autoFocus
               id="account-pin"
               inputClassName="text-center text-lg tracking-[0.5em]"
               inputMode="numeric"
@@ -125,7 +111,7 @@ const AccountAuth: React.FC = () => {
           )}
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">
             {usePassword
-              ? 'Use the wallet password you chose when you created your wallet.'
+              ? 'Forgot the code? Sign in with the wallet password you chose when you created your wallet.'
               : 'Use the six-digit code you chose when you created your wallet.'}
           </p>
           <button
@@ -133,7 +119,7 @@ const AccountAuth: React.FC = () => {
             onClick={() => { setUsePassword((current) => !current); setError(''); }}
             type="button"
           >
-            {usePassword ? 'Use six-digit code instead' : 'Use wallet password instead'}
+            {usePassword ? 'Use six-digit code instead' : 'Forgot the code? Use wallet password'}
           </button>
 
           <button

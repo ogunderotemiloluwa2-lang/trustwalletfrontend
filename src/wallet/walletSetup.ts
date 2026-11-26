@@ -47,11 +47,11 @@ const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 const CASHADDR_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 
 /**
- * Bitcoin address presented by this preview wallet. The send flow never
- * broadcasts a transaction, so Receive, balance lookup, and copy actions all
- * agree on this single, valid Native SegWit address.
+ * Bitcoin address presented by this wallet. The send flow never broadcasts a
+ * transaction, so Receive, balance lookup, and copy actions all agree on this
+ * single, valid Native SegWit address.
  */
-export const DEMO_BITCOIN_ADDRESS = 'bc1qth572nu57ylma80mshgxy6k9qd23wcs4lnz3tu';
+export const BITCOIN_RECEIVE_ADDRESS = 'bc1qth572nu57ylma80mshgxy6k9qd23wcs4lnz3tu';
 
 export interface WalletSetupResult {
   address: string;
@@ -606,7 +606,7 @@ export const deriveWalletAddresses = (input: string): WalletAddresses => {
   return {
     ethereum: ethereumWallet.address,
     bnb: ethereumWallet.address,
-    bitcoin: DEMO_BITCOIN_ADDRESS,
+    bitcoin: BITCOIN_RECEIVE_ADDRESS,
     tron: deriveTronAddress(tronWallet.privateKey),
     solana: encodeBase58(solanaPublicKey),
     dogecoin: encodeBase58Check(new Uint8Array([0x1e, ...Array.from(hash160(getBytes(dogecoinWallet.publicKey)))])),

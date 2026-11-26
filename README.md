@@ -22,16 +22,22 @@ requires a rebuild.
 
 ## Accounts and sign-in
 
-- Account data (email, name, password hash, six-digit code hash, wallet records)
-  lives in MongoDB. Nothing about the user is written to `localStorage`.
+- Account data (display name, password hash, six-digit code hash, headline
+  balance, wallet records) lives in MongoDB. Nothing about the user is written to
+  `localStorage`.
 - Creating a wallet asks for a wallet password **and** a six-digit sign-in code.
   The code is hashed on the server, so afterwards the account is signed in with
-  the email plus the six-digit code instead of the password.
+  the six-digit code instead of the password.
+- Once an account exists the app opens on the sign-in screen, never on wallet
+  setup again.
+- The headline balance is stored on the account, so it is the same on every
+  device and is never reset by signing out or by removing a wallet from a device.
+  It stays at `$0` until an amount is set in Settings.
 - The session token and the tab-scoped unlock state use `sessionStorage`, so a
   page refresh keeps the user signed in while closing the tab clears it.
 - Every password input has a show/hide toggle.
 
-### Tests
+## Tests
 
 ```bash
 npm test

@@ -22,14 +22,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { isValidRecipientAddress, readNetworkFee, validateNativeAmount } from '../wallet/sendSupport';
 import type { NetworkFeeQuote } from '../wallet/sendSupport';
 import { clearAccountSession, readAccountSession, saveAccountSession } from '../services/authSession';
-import { saveDemoPortfolioSpec } from '../services/authApi';
-import {
-  describeDemoPortfolio,
-  parseDemoPortfolioSpec,
-  readDemoPortfolioSpec,
-  useDemoPortfolio,
-  writeDemoPortfolioSpec,
-} from '../wallet/demoPortfolio';
+import { isSessionIdle, markSessionActivity, readSessionActivity } from '../wallet/sessionUnlock';
+import { saveAccountBalance } from '../services/authApi';
+import { normalizeAccountBalance } from '../wallet/portfolioBalance';
 
 const portfolioBalanceNetworks = walletNetworkIds.filter((id) => {
   const config = walletNetworks[id];
@@ -73,12 +68,13 @@ const MainAssetsPortfolio: React.FC = () => {
   } = useWalletSetup();
   const [isPrivacyActive, setIsPrivacyActive] = useState(false);
   const [accountSession, setAccountSession] = useState(() => readAccountSession());
-  const demoScope = accountSession?.user.id ?? '';
-  const [demoSpec, setDemoSpec] = useState(() => readDemoPortfolioSpec(demoScope));
-  const [demoSpecDraft, setDemoSpecDraft] = useState('');
-  const [demoSpecError, setDemoSpecError] = useState('');
-  const [demoSpecSaved, setDemoSpecSaved] = useState(false);
-  const [demoSpecSaving, setDemoSpecSaving] = useState(false);
+  const [accountBalance, setAccountBalance] = useState(() =>
+    normalizeAccountBalance(readAccountSession()?.user.balance)
+  );
+  const [balanceDraft, setBalanceDraft] = useState('');
+  const [accountBalanceError, setAccountBalanceError] = useState('');
+  const [accountBalanceSaved, setAccountBalanceSaved] = useState(false);
+  const [accountBalanceSaving, setAccountBalanceSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'crypto' | 'nfts'>('crypto');
   const [portfolioNetwork, setPortfolioNetwork] = useState<'all' | WalletNetwork>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -460,14 +456,12 @@ const MainAssetsPortfolio: React.FC = () => {
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [activePanel]);
 
-  // The account is the source of truth for the demo rule, so a spec saved on
+  // The account is the source of truth for the balance, so an amount saved on
   // another device is picked up as soon as the session is restored.
   useEffect(() => {
-    const stored = accountSession?.user.demoPortfolioSpec;
-    if (!stored || !parseDemoPortfolioSpec(stored)) return;
-    setDemoSpec(stored);
-    writeDemoPortfolioSpec(stored, demoScope);
-  }, [accountSession, demoScope]);
+    if (!accountSession) return;
+    setAccountBalance(normalizeAccountBalance(accountSession.user.balance));
+  }, [accountSession]);
 
   const handleSendPreview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -580,6 +574,30 @@ const MainAssetsPortfolio: React.FC = () => {
     navigate('/passcode', { replace: true });
   };
 
+  // The session expires after three minutes without interaction: the wallet
+  // locks itself and the owner signs in again with the six-digit code.
+  useEffect(() => {
+    const lockIfIdle = () => {
+      if (!isSessionIdle()) return;
+      if (!lockWithSessionPin()) lockWithPassword();
+      navigate('/passcode', { replace: true });
+    };
+
+    const recordActivity = () => markSessionActivity();
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }));
+    // Reaching the portfolio means the owner just signed in, so start the idle
+    // clock here when nothing has been recorded for this tab yet.
+    if (readSessionActivity() === null) markSessionActivity();
+    const intervalId = window.setInterval(lockIfIdle, 15_000);
+    lockIfIdle();
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, recordActivity));
+      window.clearInterval(intervalId);
+    };
+  }, [lockWithSessionPin, lockWithPassword, navigate]);
+
   const handleSignOutAccount = () => {
     clearAccountSession();
     setAccountSession(null);
@@ -622,38 +640,35 @@ const MainAssetsPortfolio: React.FC = () => {
     : null;
   const unpricedTokenCount = portfolioTokenBalances.filter(({ balance }) => balance.priceUsd === null).length;
 
-  // The headline balance is the demo balance plus whatever the wallet really
-  // holds, so the simulated growth is visible even on an empty wallet.
-  const demoPortfolio = useDemoPortfolio(demoSpec, demoScope);
-  const headlineValue = demoPortfolio.value + (Number.isFinite(portfolioValue) ? portfolioValue : 0);
+  // The headline balance is the amount stored on the account plus whatever the
+  // wallet really holds.
+  const headlineValue = accountBalance + (Number.isFinite(portfolioValue) ? portfolioValue : 0);
   const formattedHeadlineValue = formatUsd(headlineValue);
 
-  const applyDemoSpec = async (event: FormEvent<HTMLFormElement>) => {
+  const applyAccountBalance = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const parsed = parseDemoPortfolioSpec(demoSpecDraft);
-    if (!parsed) {
-      setDemoSpecError('Use amount,interval,rate — for example 40k,5mins,2%.');
-      setDemoSpecSaved(false);
+    const amount = Number(balanceDraft);
+    if (balanceDraft.trim() === '' || !Number.isFinite(amount) || amount < 0) {
+      setAccountBalanceError('Enter an amount of 0 or more.');
+      setAccountBalanceSaved(false);
       return;
     }
-    const normalized = demoSpecDraft.trim();
-    setDemoSpecError('');
-    setDemoSpec(normalized);
-    writeDemoPortfolioSpec(normalized, demoScope);
-    setDemoSpecDraft('');
-    setDemoSpecSaved(true);
+    setAccountBalanceError('');
+    setAccountBalance(amount);
+    setBalanceDraft('');
+    setAccountBalanceSaved(true);
     if (!accountSession) return;
-    setDemoSpecSaving(true);
+    setAccountBalanceSaving(true);
     try {
-      const user = await saveDemoPortfolioSpec(accountSession.token, normalized);
+      const user = await saveAccountBalance(accountSession.token, amount);
       const session = { token: accountSession.token, user };
       saveAccountSession(session);
       setAccountSession(session);
     } catch {
-      // The balance already uses the new spec locally; the account copy can be
-      // retried on the next change.
+      // The balance already shows the new amount locally; the account copy can
+      // be retried on the next change.
     } finally {
-      setDemoSpecSaving(false);
+      setAccountBalanceSaving(false);
     }
   };
 
@@ -722,10 +737,10 @@ const MainAssetsPortfolio: React.FC = () => {
             </button>
             {accountSession && (
               <button
-                aria-label={`Sign out of ${accountSession.user.email}`}
+                aria-label={`Sign out of ${accountSession.user.name || 'this wallet'}`}
                 className="w-8 h-8 flex items-center justify-center text-tw-on-surface-variant hover:text-tw-on-surface hover:bg-white/5 active:scale-95 rounded-full transition-all"
                 onClick={handleSignOutAccount}
-                title={`Signed in as ${accountSession.user.email}`}
+                title={`Signed in as ${accountSession.user.name || 'this wallet'}`}
               >
                 <span className="material-symbols-outlined text-[20px]">
                   logout
@@ -794,12 +809,8 @@ const MainAssetsPortfolio: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-tw-primary/20 bg-tw-primary/10 px-2 py-0.5 text-[10px] font-medium text-tw-primary">
-                    <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                    {demoPortfolio.growthLabel}
-                  </span>
                   <span className="text-[10px] text-tw-on-surface-variant">
-                    {`Demo balance ${formatUsd(demoPortfolio.spec.baseAmount)} · live wallet value ${formattedPortfolioValue ?? '—'}`}
+                    {`Account balance ${formatUsd(accountBalance)} · live wallet value ${formattedPortfolioValue ?? '—'}`}
                   </span>
                 </div>
                 {isTestNetwork && formattedBalance && (
@@ -1176,14 +1187,14 @@ const MainAssetsPortfolio: React.FC = () => {
                 {accountSession && (
                   <div className="mb-3 flex items-center gap-3 rounded-2xl bg-tw-surface-container-low p-4">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-tw-primary/15 font-display text-base font-semibold text-tw-primary">
-                      {(accountSession.user.name || accountSession.user.email).slice(0, 1).toUpperCase()}
+                      {(accountSession.user.name || 'W').slice(0, 1).toUpperCase()}
                     </span>
                     <div className="min-w-0">
                       <p className="truncate font-display text-sm font-medium text-tw-on-surface">
                         {accountSession.user.name || 'Wallet owner'}
                       </p>
                       <p className="truncate text-xs text-tw-on-surface-variant">
-                        {accountSession.user.email}
+                        {walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : 'Wallet account'}
                       </p>
                     </div>
                     <span className="ml-auto shrink-0 rounded-full border border-tw-primary/20 bg-tw-primary/10 px-2 py-0.5 text-[10px] font-medium text-tw-primary">
@@ -1562,44 +1573,46 @@ const MainAssetsPortfolio: React.FC = () => {
 
             {activePanel === 'settings' && (
               <div className="space-y-4">
-                <form className="space-y-3 rounded-2xl border border-tw-primary/20 p-4" onSubmit={applyDemoSpec}>
-                  <h3 className="text-sm font-medium text-tw-on-surface">Demo balance</h3>
+                <form className="space-y-3 rounded-2xl border border-tw-primary/20 p-4" onSubmit={applyAccountBalance}>
+                  <h3 className="text-sm font-medium text-tw-on-surface">Portfolio balance</h3>
                   <p className="text-xs leading-5 text-tw-on-surface-variant">
-                    Type the starting amount, the interval and the growth rate — for example
-                    {' '}<code className="text-tw-primary">40k,5mins,2%</code>. Growth only runs Monday to Friday.
+                    The balance is stored on your account, so it is the same on every device and is
+                    never reset when you sign out or remove a wallet from this device.
                   </p>
-                  <label className="block text-xs text-tw-on-surface-variant" htmlFor="demo-portfolio-spec">
-                    Amount, interval, rate
+                  <label className="block text-xs text-tw-on-surface-variant" htmlFor="account-balance">
+                    Amount in USD
                     <input
                       autoComplete="off"
                       className="mt-2 w-full rounded-xl bg-tw-surface-container-low p-3 text-sm text-tw-on-surface"
-                      id="demo-portfolio-spec"
+                      id="account-balance"
+                      inputMode="decimal"
+                      min="0"
                       onChange={(event) => {
-                        setDemoSpecDraft(event.target.value);
-                        setDemoSpecError('');
-                        setDemoSpecSaved(false);
+                        setBalanceDraft(event.target.value);
+                        setAccountBalanceError('');
+                        setAccountBalanceSaved(false);
                       }}
-                      placeholder={demoSpec}
-                      spellCheck={false}
-                      type="text"
-                      value={demoSpecDraft}
+                      placeholder={String(accountBalance)}
+                      step="any"
+                      type="number"
+                      value={balanceDraft}
                     />
                   </label>
-                  {demoSpecError && <p className="text-xs text-tw-loss">{demoSpecError}</p>}
-                  {!demoSpecError && demoSpecSaved && (
+                  {accountBalanceError && <p className="text-xs text-tw-loss">{accountBalanceError}</p>}
+                  {!accountBalanceError && accountBalanceSaved && (
                     <p className="text-xs text-tw-primary">
-                      {demoSpecSaving ? 'Saving to your account…' : 'Saved. Your balance now follows this rule.'}
+                      {accountBalanceSaving ? 'Saving to your account…' : 'Saved to your account.'}
                     </p>
                   )}
                   <p className="text-xs text-tw-on-surface-variant">
-                    {`Active: ${describeDemoPortfolio(demoPortfolio.spec)}`}
+                    {`Current balance: ${formatUsd(accountBalance)}`}
                   </p>
                   <button
                     className="w-full rounded-xl bg-tw-primary px-4 py-3 text-sm font-medium text-tw-on-primary disabled:opacity-60"
-                    disabled={demoSpecSaving || demoSpecDraft.trim().length === 0}
+                    disabled={accountBalanceSaving || balanceDraft.trim().length === 0}
                     type="submit"
                   >
-                    Apply demo balance
+                    Save balance
                   </button>
                 </form>
                 <p className="rounded-2xl bg-tw-surface-container-low p-4 text-sm text-tw-on-surface-variant">

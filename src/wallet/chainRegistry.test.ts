@@ -2,6 +2,7 @@ import { isWalletNetwork, walletNetworkIds, walletNetworks } from './chainRegist
 
 test('registry covers the requested major chain families and remains data-driven', () => {
   expect(walletNetworkIds.length).toBeGreaterThanOrEqual(38);
+  expect(walletNetworkIds[0]).toBe('bitcoin');
   expect(walletNetworks.ethereum.family).toBe('evm');
   expect(walletNetworks.bitcoin.family).toBe('utxo');
   expect(walletNetworks.cosmos.family).toBe('cosmos');

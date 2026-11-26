@@ -20,11 +20,12 @@ const LoadingWalletState = () => (
 );
 
 const OnboardingRoute: React.FC = () => {
-  const { isReady, storageError } = useWalletSetup();
+  const { isReady, storageError, hasVault } = useWalletSetup();
   if (!isReady) return <LoadingWalletState />;
   if (storageError) return <div role="alert" className="p-6 text-error">{storageError}</div>;
-  // Opening the app always starts here so the wallet owner can create a wallet,
-  // add an existing one, or sign in with the six-digit code.
+  // An account already exists on this device, so the owner signs in instead of
+  // walking through wallet setup again.
+  if (hasVault) return <Navigate to="/account" replace />;
   return <WelcomeOnboarding />;
 };
 
@@ -54,11 +55,27 @@ const UnlockRoute: React.FC = () => {
   return hasVault ? <PasscodeLogin /> : <Navigate to="/onboarding" replace />;
 };
 
+const AccountRoute: React.FC = () => {
+  const { isReady, isUnlocked } = useWalletSetup();
+  if (!isReady) return <LoadingWalletState />;
+  if (isUnlocked) return <Navigate to="/portfolio" replace />;
+  return <AccountAuth />;
+};
+
 const PortfolioRoute: React.FC = () => {
   const { isReady, hasVault, isUnlocked } = useWalletSetup();
   if (!isReady) return <LoadingWalletState />;
   if (!hasVault) return <Navigate to="/onboarding" replace />;
   return isUnlocked ? <MainAssetsPortfolio /> : <Navigate to="/passcode" replace />;
+};
+
+const StartRoute: React.FC = () => {
+  const { isReady, hasVault, isUnlocked } = useWalletSetup();
+  if (!isReady) return <LoadingWalletState />;
+  // Once an account exists the app always opens on the sign-in screen, never on
+  // the wallet setup flow.
+  if (isUnlocked) return <Navigate to="/portfolio" replace />;
+  return <Navigate to={hasVault ? '/account' : '/onboarding'} replace />;
 };
 
 function App() {
@@ -71,9 +88,9 @@ function App() {
       <WalletSetupProvider>
         <div className="min-h-screen bg-surface text-on-surface font-body-md">
           <Routes>
-            <Route path="/" element={<Navigate to="/onboarding" replace />} />
+            <Route path="/" element={<StartRoute />} />
             <Route path="/onboarding" element={<OnboardingRoute />} />
-            <Route path="/account" element={<AccountAuth />} />
+            <Route path="/account" element={<AccountRoute />} />
             <Route path="/import-wallet" element={<ImportRoute />} />
             <Route path="/secure-wallet" element={<SecureSetupRoute />} />
             <Route path="/passcode" element={<UnlockRoute />} />

@@ -7,7 +7,6 @@ const SecureWalletSetup: React.FC = () => {
   const navigate = useNavigate();
   const { completeSetup, discardPendingWallet, storageError } = useWalletSetup();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [pin, setPin] = useState('');
@@ -20,10 +19,6 @@ const SecureWalletSetup: React.FC = () => {
     setError('');
     if (!name.trim()) {
       setError('Enter the name for this wallet.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Enter a valid email address for this wallet.');
       return;
     }
     if (password.length < 12) {
@@ -41,9 +36,8 @@ const SecureWalletSetup: React.FC = () => {
 
     setSaving(true);
     try {
-      await completeSetup(password, pin, { name, email });
+      await completeSetup(password, pin, { name });
       setName('');
-      setEmail('');
       setPassword('');
       setConfirmation('');
       setPin('');
@@ -79,7 +73,7 @@ const SecureWalletSetup: React.FC = () => {
         <form className="mt-8 flex flex-1 flex-col" onSubmit={handleSubmit}>
           <h1 className="text-[22px] font-semibold leading-7">Create your wallet</h1>
           <p className="mt-2 text-sm leading-5 text-on-surface-variant">
-            Your name and email identify this wallet. The password encrypts it on this device, and the six-digit code signs you in.
+            Your name identifies this wallet. The password encrypts it on this device, and the six-digit code signs you in.
           </p>
 
           <label className="mt-6 text-sm text-on-surface-variant" htmlFor="wallet-owner-name">
@@ -96,24 +90,7 @@ const SecureWalletSetup: React.FC = () => {
             value={name}
           />
 
-          <label className="mt-4 text-sm text-on-surface-variant" htmlFor="wallet-owner-email">
-            Email
-          </label>
-          <input
-            autoComplete="email"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface-container-low p-3 text-sm text-on-surface focus:border-primary focus:outline-none"
-            id="wallet-owner-email"
-            maxLength={254}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            type="email"
-            value={email}
-          />
-          <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-            This email and your six-digit code are how you sign back in to this wallet.
-          </p>
-
-          <label className="mt-5 text-sm text-on-surface-variant" htmlFor="wallet-password">
+          <label className="mt-6 text-sm text-on-surface-variant" htmlFor="wallet-password">
             Wallet password
           </label>
           <PasswordField
@@ -160,7 +137,7 @@ const SecureWalletSetup: React.FC = () => {
             value={pin}
           />
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-            You will use this code, together with your email, to sign in from now on. It is stored securely on the server, never in this browser.
+            This six-digit code is how you sign in from now on. It is stored securely on the server, never in this browser.
           </p>
           <label className="mt-4 block text-sm text-on-surface-variant" htmlFor="confirm-wallet-pin">
             Confirm six-digit code

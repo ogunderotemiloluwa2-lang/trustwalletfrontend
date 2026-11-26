@@ -1,11 +1,12 @@
+import { normalizeAccountBalance } from '../wallet/portfolioBalance';
+
 export interface AuthenticatedUser {
   id: string;
-  email: string;
   name: string;
   /** True once the account has a six-digit sign-in code stored on the server. */
   hasPin: boolean;
-  /** Demo portfolio spec (`40k,5mins,2%`) saved on the account, if any. */
-  demoPortfolioSpec: string;
+  /** Headline balance in USD, stored on the account so every device agrees. */
+  balance: number;
 }
 
 export interface AuthSession {
@@ -34,16 +35,14 @@ const parseUser = (value: unknown): AuthenticatedUser => {
     throw new Error('Authentication service returned an invalid user profile.');
   }
   const user = value as Record<string, unknown>;
-  if (typeof user.id !== 'string' || typeof user.email !== 'string' ||
-      typeof user.name !== 'string') {
+  if (typeof user.id !== 'string' || typeof user.name !== 'string') {
     throw new Error('Authentication service returned an invalid user profile.');
   }
   return {
     id: user.id,
-    email: user.email,
     name: user.name,
     hasPin: user.hasPin === true,
-    demoPortfolioSpec: typeof user.demoPortfolioSpec === 'string' ? user.demoPortfolioSpec : '',
+    balance: normalizeAccountBalance(user.balance),
   };
 };
 
@@ -68,19 +67,22 @@ const request = async (
 };
 
 export const registerAccount = (
-  input: { email: string; password: string; name?: string },
+  input: { password: string; name?: string },
   fetcher: typeof fetch = fetch
 ): Promise<AuthSession> => request('register', {
-  email: input.email,
   password: input.password,
   name: input.name || '',
 }, fetcher);
 
+/**
+ * Signs in with the six-digit code, or with the wallet password when the code
+ * has been forgotten. There is no email address: the server locates the account
+ * from the credential itself.
+ */
 export const loginAccount = (
-  input: { email: string; password?: string; pin?: string },
+  input: { password?: string; pin?: string },
   fetcher: typeof fetch = fetch
 ): Promise<AuthSession> => request('login', {
-  email: input.email,
   password: input.password || '',
   pin: input.pin || '',
 }, fetcher);
@@ -125,26 +127,26 @@ export const fetchAuthenticatedProfile = async (
 };
 
 /**
- * Saves the demo portfolio spec (`40k,5mins,2%`) on the account so the
- * simulated balance follows the wallet owner instead of this browser.
+ * Saves the headline balance on the account so the amount follows the wallet
+ * owner instead of this browser.
  */
-export const saveDemoPortfolioSpec = async (
+export const saveAccountBalance = async (
   token: string,
-  spec: string,
+  balance: number,
   fetcher: typeof fetch = fetch
 ): Promise<AuthenticatedUser> => {
-  const response = await fetcher(authUrl('demo-portfolio'), {
+  const response = await fetcher(authUrl('balance'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ spec }),
+    body: JSON.stringify({ balance }),
   });
   const result: AuthResponse = await response.json();
   if (!response.ok) {
-    throw new Error(typeof result.error === 'string' ? result.error : 'Could not save the demo balance.');
+    throw new Error(typeof result.error === 'string' ? result.error : 'Could not save the balance.');
   }
   return parseUser(result.user);
 };

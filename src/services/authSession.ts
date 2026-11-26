@@ -1,4 +1,5 @@
 import { AuthenticatedUser, AuthSession } from './authApi';
+import { normalizeAccountBalance } from '../wallet/portfolioBalance';
 
 /**
  * Holds the signed-in account for the current tab only.
@@ -19,18 +20,16 @@ const isStoredSession = (value: unknown): value is StoredSession => {
   const session = value as Record<string, unknown>;
   const user = session.user as Record<string, unknown> | undefined;
   return typeof session.token === 'string' && !!user &&
-    typeof user.id === 'string' && typeof user.email === 'string' && typeof user.name === 'string';
+    typeof user.id === 'string' && typeof user.name === 'string';
 };
 
-/** Older sessions were stored before the demo balance existed. */
+/** Older sessions were stored before the account balance existed. */
 const withDefaults = (session: StoredSession): AuthSession => ({
   token: session.token,
   user: {
     ...session.user,
     hasPin: session.user.hasPin === true,
-    demoPortfolioSpec: typeof session.user.demoPortfolioSpec === 'string'
-      ? session.user.demoPortfolioSpec
-      : '',
+    balance: normalizeAccountBalance(session.user.balance),
   },
 });
 

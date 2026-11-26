@@ -4,7 +4,7 @@ const SESSION_KEY = 'account-session';
 
 const validSession = {
   token: 'header.payload.signature',
-  user: { id: 'user_1', email: 'ada@example.com', name: 'Ada', hasPin: false, demoPortfolioSpec: '' },
+  user: { id: 'user_1', name: 'Ada', hasPin: false, balance: 0 },
 };
 
 describe('account session storage', () => {
@@ -32,7 +32,7 @@ describe('account session storage', () => {
 
     window.sessionStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ token: 'abc', user: { id: 1, email: 'a@b.c', name: 'A' } })
+      JSON.stringify({ token: 'abc', user: { id: 1, name: 'A' } })
     );
     expect(readAccountSession()).toBeNull();
   });

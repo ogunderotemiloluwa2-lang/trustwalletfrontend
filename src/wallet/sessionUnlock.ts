@@ -10,6 +10,10 @@
 const UNLOCK_KEY = 'wallet-session-unlock';
 const LOCKED_KEY = 'wallet-session-locked';
 const PIN_KEY = 'wallet-session-pin';
+const ACTIVITY_KEY = 'wallet-session-activity';
+
+/** The wallet locks itself after this much inactivity. */
+export const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
 
 export const rememberUnlock = (password: string): void => {
   try {
@@ -91,4 +95,46 @@ export const forgetSessionPin = (): void => {
   } catch {
     // Ignore storage failures while locking.
   }
+};
+
+/**
+ * Records the last moment the owner interacted with the wallet. The timestamp
+ * lives in `sessionStorage` so a refresh cannot be used to outlive the idle
+ * timeout, and it is never written to `localStorage`.
+ */
+export const markSessionActivity = (now: number = Date.now()): void => {
+  try {
+    window.sessionStorage.setItem(ACTIVITY_KEY, String(now));
+  } catch {
+    // A blocked or full session storage must not break the wallet.
+  }
+};
+
+export const readSessionActivity = (): number | null => {
+  try {
+    const raw = window.sessionStorage.getItem(ACTIVITY_KEY);
+    if (!raw) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+export const clearSessionActivity = (): void => {
+  try {
+    window.sessionStorage.removeItem(ACTIVITY_KEY);
+  } catch {
+    // Ignore storage failures while locking.
+  }
+};
+
+/**
+ * True when the wallet has been untouched for longer than the idle timeout, or
+ * when no activity was ever recorded for this tab.
+ */
+export const isSessionIdle = (now: number = Date.now()): boolean => {
+  const last = readSessionActivity();
+  if (last === null) return true;
+  return now - last >= IDLE_TIMEOUT_MS;
 };

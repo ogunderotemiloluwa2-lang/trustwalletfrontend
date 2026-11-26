@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import TrustShield from '../components/common/TrustShield';
 import SecurityBadge from '../components/common/SecurityBadge';
 import { useWalletSetup } from '../wallet/WalletSetupContext';
 
 const WelcomeOnboarding: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { createWallet } = useWalletSetup();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [setupError, setSetupError] = useState('');
-
-  const accountNotice = (location.state as { accountEmail?: string } | null) || {};
 
   const slides = [
     {
@@ -163,17 +160,6 @@ const WelcomeOnboarding: React.FC = () => {
                 {setupError}
               </p>
             )}
-            {/* Account confirmation after sign-in */}
-            {accountNotice.accountEmail && (
-              <p
-                aria-live="polite"
-                className="mb-3 w-full rounded-2xl border border-primary/20 bg-surface-container-high px-4 py-3 text-center font-body-sm text-body-sm text-on-surface-variant"
-              >
-                Signed in as <span className="text-on-surface">{accountNotice.accountEmail}</span>.
-                Create or import a wallet to continue.
-              </p>
-            )}
-
             {/* Primary CTA: Create new wallet */}
             <button
               className="w-full py-4 px-6 rounded-full bg-primary-container text-white font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary-container/30 transition-all duration-200 active:scale-[0.98] hover:bg-secondary-container"
