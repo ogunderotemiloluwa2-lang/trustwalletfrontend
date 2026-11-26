@@ -67,6 +67,12 @@ interface WalletSetupContextValue {
   unlockWithVerifiedPin: (pin: string) => Promise<boolean>;
   /** Replaces the code remembered on this device after a reset. */
   updateSessionPin: (pin: string) => void;
+  /**
+   * Checks the wallet password against the encrypted keystore on this device
+   * and remembers it, so the six-digit code can open the vault afterwards. The
+   * vault is left locked: the code is still required to open it.
+   */
+  prepareCodeUnlock: (password: string) => Promise<boolean>;
   lockWithSessionPin: () => boolean;
   lockWithPassword: () => void;
   discardPendingWallet: () => void;
@@ -307,6 +313,21 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     rememberSessionPin(pin);
   }, []);
 
+  const prepareCodeUnlock = useCallback(async (password: string) => {
+    const encryptedJson = await readEncryptedKeystore();
+    if (!encryptedJson) return false;
+    try {
+      // Proving the password against the keystore is what makes the code usable
+      // later: the vault is still encrypted with it, so the code alone cannot
+      // open the wallet without this remembered key.
+      await unlockEncryptedWallet(encryptedJson, password);
+    } catch {
+      return false;
+    }
+    rememberUnlock(password);
+    return true;
+  }, []);
+
   const lockWithSessionPin = useCallback(() => {
     if (!sessionPin) return false;
     // An explicit lock must survive a refresh, so remember that the user locked
@@ -379,6 +400,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
       unlockWithPassword,
       unlockWithVerifiedPin,
       updateSessionPin,
+      prepareCodeUnlock,
       lockWithSessionPin,
       lockWithPassword,
       discardPendingWallet,
@@ -388,7 +410,7 @@ export const WalletSetupProvider: React.FC<React.PropsWithChildren> = ({ childre
     [
       address, receiveAddresses, mnemonic, isReady, hasVault, pendingWallet, isUnlocked, sessionPin, network, storageError,
       createWallet, importWallet, completeSetup, unlockWithPassword,
-      unlockWithVerifiedPin, updateSessionPin, lockWithSessionPin, lockWithPassword,
+      unlockWithVerifiedPin, updateSessionPin, prepareCodeUnlock, lockWithSessionPin, lockWithPassword,
       discardPendingWallet, deleteVault, selectNetwork,
     ]
   );

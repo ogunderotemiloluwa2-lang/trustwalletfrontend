@@ -16,7 +16,7 @@ import { useWalletSetup } from '../wallet/WalletSetupContext';
  */
 const AccountAuth: React.FC = () => {
   const navigate = useNavigate();
-  const { hasVault } = useWalletSetup();
+  const { hasVault, prepareCodeUnlock } = useWalletSetup();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,6 +28,10 @@ const AccountAuth: React.FC = () => {
     try {
       const session = await loginAccount({ password });
       saveAccountSession(session);
+      // The vault is encrypted with this password, so it is remembered here to
+      // let the six-digit code open the wallet on the next screen. The vault
+      // itself stays locked until that code is entered.
+      if (hasVault) await prepareCodeUnlock(password);
       setPassword('');
       // Signing in never opens the vault on its own: the six-digit code does
       // that on the passcode screen.

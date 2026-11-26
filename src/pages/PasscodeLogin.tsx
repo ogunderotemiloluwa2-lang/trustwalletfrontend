@@ -22,7 +22,7 @@ const UNLOCK_SPINNER_MS = 2500;
  */
 const PasscodeLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { unlockWithVerifiedPin, updateSessionPin, lockWithPassword } = useWalletSetup();
+  const { unlockWithVerifiedPin, updateSessionPin, prepareCodeUnlock, lockWithPassword } = useWalletSetup();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -45,7 +45,7 @@ const PasscodeLogin: React.FC = () => {
       saveAccountSession(session);
       const opened = await unlockWithVerifiedPin(pin);
       if (!opened) {
-        setError('This device cannot open the wallet with that code. Sign in with your wallet password.');
+        setError('This device cannot open the wallet with that code. Sign in with your wallet password, or restore the wallet with your recovery phrase.');
         setPin('');
         return;
       }
@@ -81,12 +81,19 @@ const PasscodeLogin: React.FC = () => {
       const session = await loginAccount({ password });
       saveAccountSession(session);
       await setAccountPin(session.token, newPin);
+      // The vault is encrypted with the wallet password, so it has to be
+      // remembered again for the new code to open the wallet.
+      const vaultReady = await prepareCodeUnlock(password);
       updateSessionPin(newPin);
       setPassword('');
       setNewPin('');
       setConfirmPin('');
       setResetting(false);
-      setNotice('Your six-digit code has been updated. Enter it to open your wallet.');
+      setNotice(
+        vaultReady
+          ? 'Your six-digit code has been updated. Enter it to open your wallet.'
+          : 'Your six-digit code has been updated, but this device cannot open the wallet with it. Restore the wallet with your recovery phrase.'
+      );
     } catch (resetError) {
       setError(
         resetError instanceof Error

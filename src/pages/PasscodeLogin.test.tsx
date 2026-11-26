@@ -6,6 +6,7 @@ const mockNavigate = jest.fn();
 const mockUnlockWithVerifiedPin = jest.fn();
 const mockUpdateSessionPin = jest.fn();
 const mockLockWithPassword = jest.fn();
+const mockPrepareCodeUnlock = jest.fn();
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
@@ -25,6 +26,7 @@ jest.mock('../wallet/WalletSetupContext', () => ({
   useWalletSetup: () => ({
     unlockWithVerifiedPin: mockUnlockWithVerifiedPin,
     updateSessionPin: mockUpdateSessionPin,
+    prepareCodeUnlock: mockPrepareCodeUnlock,
     lockWithPassword: mockLockWithPassword,
   }),
 }));
@@ -38,6 +40,7 @@ const typeCode = (label: string, code: string) => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPrepareCodeUnlock.mockResolvedValue(true);
 });
 
 test('the back arrow signs out and returns to the password screen', () => {
@@ -64,6 +67,7 @@ test('resets the code on the account after confirming the wallet password', asyn
 
   await waitFor(() => expect(setAccountPin).toHaveBeenCalledWith('token-1', '654321'));
   expect(loginAccount).toHaveBeenCalledWith({ password: 'correct horse' });
+  expect(mockPrepareCodeUnlock).toHaveBeenCalledWith('correct horse');
   expect(mockUpdateSessionPin).toHaveBeenCalledWith('654321');
   expect(await screen.findByText(/has been updated/i)).toBeInTheDocument();
 });
