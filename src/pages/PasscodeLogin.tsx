@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TrustShield from '../components/common/TrustShield';
 import PinInput from '../components/common/PinInput';
 import PasswordField from '../components/common/PasswordField';
+import CreateAccountLink from '../components/common/CreateAccountLink';
 import { loginAccount, setAccountPin } from '../services/authApi';
 import { clearAccountSession, saveAccountSession } from '../services/authSession';
 import { useWalletSetup } from '../wallet/WalletSetupContext';
@@ -247,6 +248,7 @@ const PasscodeLogin: React.FC = () => {
         <aside className="mt-6 rounded-2xl border border-error/20 bg-error-container/30 p-4 text-xs leading-5 text-on-surface-variant">
           Never share your six-digit code. Anyone who has it can open your wallet on this device.
         </aside>
+        <CreateAccountLink className="mt-4" />
         <button
           className="mt-auto py-6 text-sm text-primary"
           onClick={() => navigate('/import-wallet')}

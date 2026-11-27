@@ -2,6 +2,7 @@ import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TrustShield from '../components/common/TrustShield';
 import PasswordField from '../components/common/PasswordField';
+import CreateAccountLink from '../components/common/CreateAccountLink';
 import { loginAccount } from '../services/authApi';
 import { saveAccountSession } from '../services/authSession';
 import { useWalletSetup } from '../wallet/WalletSetupContext';
@@ -131,6 +132,8 @@ const AccountAuth: React.FC = () => {
         <p className="mt-6 text-center text-xs leading-5 text-on-surface-variant">
           No account yet? Create a new wallet or add an existing one — your account is created with it.
         </p>
+
+        <CreateAccountLink className="mt-2" />
 
         <button
           className="mt-auto py-6 text-sm text-primary"

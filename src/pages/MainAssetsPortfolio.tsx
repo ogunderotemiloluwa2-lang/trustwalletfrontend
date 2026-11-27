@@ -605,6 +605,15 @@ const MainAssetsPortfolio: React.FC = () => {
     navigate('/account', { replace: true });
   };
 
+  // Creating a wallet creates the account that owns it, so this is the way to
+  // start a second account from inside the wallet.
+  const handleCreateAccount = () => {
+    clearAccountSession();
+    setAccountSession(null);
+    lockWithPassword();
+    navigate('/onboarding', { replace: true });
+  };
+
   const handleDeleteWallet = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setDeleteError('');
@@ -733,6 +742,16 @@ const MainAssetsPortfolio: React.FC = () => {
             >
               <span className="material-symbols-outlined text-[20px]">
                 lock
+              </span>
+            </button>
+            <button
+              aria-label="Create a new account"
+              className="w-8 h-8 flex items-center justify-center text-tw-on-surface-variant hover:text-tw-on-surface hover:bg-white/5 active:scale-95 rounded-full transition-all"
+              onClick={handleCreateAccount}
+              title="Create a new account"
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                person_add
               </span>
             </button>
             {accountSession && (
