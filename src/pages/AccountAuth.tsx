@@ -137,7 +137,7 @@ const AccountAuth: React.FC = () => {
 
         <button
           className="mt-auto py-6 text-sm text-primary"
-          onClick={() => navigate('/onboarding')}
+          onClick={() => navigate('/create-account')}
           type="button"
         >
           Back to wallet setup

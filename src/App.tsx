@@ -12,7 +12,7 @@ import AccountAuth from './pages/AccountAuth';
 import { WalletSetupProvider } from './wallet/WalletSetupContext';
 import SecureWalletSetup from './pages/SecureWalletSetup';
 import { useWalletSetup } from './wallet/WalletSetupContext';
-import { readAccountSession } from './services/authSession';
+import { clearAccountSession, readAccountSession } from './services/authSession';
 
 const LoadingWalletState = () => (
   <div className="flex min-h-screen items-center justify-center bg-surface px-6 text-center text-sm text-on-surface-variant">
@@ -47,6 +47,25 @@ const ImportRoute: React.FC = () => {
   if (!isReady) return <LoadingWalletState />;
   if (storageError) return <div role="alert" className="p-6 text-error">{storageError}</div>;
   return <ImportWallet />;
+};
+
+/**
+ * Wallet creation, reachable even when a wallet already exists on this device.
+ * `/onboarding` redirects to sign-in in that case, which would bounce a new
+ * user straight back to the screen they came from.
+ *
+ * Any signed-in account is dropped on entry, otherwise the new wallet would be
+ * saved onto the account that is already signed in.
+ */
+const CreateAccountRoute: React.FC = () => {
+  const { isReady, storageError, lockWithPassword } = useWalletSetup();
+  useEffect(() => {
+    clearAccountSession();
+    lockWithPassword();
+  }, [lockWithPassword]);
+  if (!isReady) return <LoadingWalletState />;
+  if (storageError) return <div role="alert" className="p-6 text-error">{storageError}</div>;
+  return <WelcomeOnboarding />;
 };
 
 const UnlockRoute: React.FC = () => {
@@ -94,6 +113,7 @@ function App() {
           <Routes>
             <Route path="/" element={<StartRoute />} />
             <Route path="/onboarding" element={<OnboardingRoute />} />
+            <Route path="/create-account" element={<CreateAccountRoute />} />
             <Route path="/account" element={<AccountRoute />} />
             <Route path="/import-wallet" element={<ImportRoute />} />
             <Route path="/secure-wallet" element={<SecureSetupRoute />} />

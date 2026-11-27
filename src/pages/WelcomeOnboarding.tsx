@@ -6,7 +6,7 @@ import { useWalletSetup } from '../wallet/WalletSetupContext';
 
 const WelcomeOnboarding: React.FC = () => {
   const navigate = useNavigate();
-  const { createWallet } = useWalletSetup();
+  const { createWallet, hasVault } = useWalletSetup();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [setupError, setSetupError] = useState('');
 
@@ -56,6 +56,20 @@ const WelcomeOnboarding: React.FC = () => {
     <div className="bg-surface min-h-screen flex flex-col pt-safe pb-safe select-none">
       <main className="flex-1 flex flex-col relative w-full bg-surface">
         <div className="flex flex-col w-full px-4 pb-space-lg">
+          {/* Leaving setup is only possible when a wallet already exists on this
+              device; otherwise there is nothing to go back to. */}
+          {hasVault && (
+            <div className="flex items-center py-3">
+              <button
+                aria-label="Back to sign in"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                onClick={() => navigate('/account')}
+                type="button"
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+            </div>
+          )}
           {/* Top Simulated Mobile Bar & Shield Brand Hero */}
           <div className="relative w-full flex flex-col items-center pt-2">
             {/* Ambient Blue Radiant Glow behind Shield */}

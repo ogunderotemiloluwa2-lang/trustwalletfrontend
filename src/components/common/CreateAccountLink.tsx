@@ -22,7 +22,7 @@ const CreateAccountLink: React.FC<CreateAccountLinkProps> = ({
   return (
     <button
       className={`flex items-center justify-center gap-1.5 text-sm text-primary ${className}`.trim()}
-      onClick={() => navigate('/onboarding')}
+      onClick={() => navigate('/create-account')}
       type="button"
     >
       <span className="material-symbols-outlined text-base">add_circle</span>

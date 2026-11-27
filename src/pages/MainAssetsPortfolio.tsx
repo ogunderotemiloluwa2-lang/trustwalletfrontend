@@ -611,7 +611,7 @@ const MainAssetsPortfolio: React.FC = () => {
     clearAccountSession();
     setAccountSession(null);
     lockWithPassword();
-    navigate('/onboarding', { replace: true });
+    navigate('/create-account', { replace: true });
   };
 
   const handleDeleteWallet = async (event: FormEvent<HTMLFormElement>) => {
